@@ -1,11 +1,11 @@
-"""Versioned, evolving core state engine for Mansion buddies."""
+"""Versioned, evolving core state engine for Castle buddies."""
 
 from datetime import datetime
 from pathlib import Path
 import platform
 from typing import Callable
 
-from mansion.storage import get_data_dir, read_json, write_json
+from castle.storage import get_data_dir, read_json, write_json
 
 DEFAULT_RANKS: tuple[tuple[int, str], ...] = (
     (0, "Spark"),
@@ -29,7 +29,7 @@ def os_key() -> str:
 
 
 def get_core_path(buddy_id: str) -> Path:
-    """Return ~/.mansion/buddies/<id>/core.json path."""
+    """Return ~/.castle/buddies/<id>/core.json path."""
     return get_data_dir() / "buddies" / buddy_id / "core.json"
 
 
@@ -81,7 +81,7 @@ def load_or_evolve_core(
     buddy_id: str,
     target_version: int = 1,
     soul_version: int = 1,
-    room: str = "Mansion Hall",
+    room: str = "Castle Hall",
     ranks: tuple[tuple[int, str], ...] = DEFAULT_RANKS,
     migrate_fn: Callable[[dict, int], dict] | None = None,
 ) -> tuple[dict, bool]:
@@ -133,7 +133,7 @@ def record_mission(
     machine_updates: dict | None = None,
     target_version: int = 1,
     soul_version: int = 1,
-    room: str = "Mansion Hall",
+    room: str = "Castle Hall",
     migrate_fn: Callable[[dict, int], dict] | None = None,
 ) -> tuple[dict, bool]:
     """Record a completed mission, award XP, update memories, and check level-up."""

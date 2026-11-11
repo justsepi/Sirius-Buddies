@@ -1,6 +1,6 @@
 """Tests for PromptBuffer line editing, history, and POSIX sequence decoding."""
 
-from mansion.ui.keys import PromptBuffer, _decode_posix_sequence
+from castle.ui.keys import PromptBuffer, _decode_posix_sequence
 
 
 def _feed_bytes(seq: bytes):

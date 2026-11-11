@@ -1,15 +1,15 @@
-"""CLI entry point for `sirius` and `mansion`."""
+"""CLI entry point for `sirius` and `castle`."""
 
 import argparse
 import subprocess
 import sys
 
-from mansion import __version__
-from mansion.brain import create_brain, record_mission_outcome
-from mansion.buddies.registry import BuddyRegistry
-from mansion.storage.config import load_config, set_config, show_config
-from mansion.storage.journal import get_recent_events
-from mansion.ui.display import Display
+from castle import __version__
+from castle.brain import create_brain, record_mission_outcome
+from castle.buddies.registry import BuddyRegistry
+from castle.storage.config import load_config, set_config, show_config
+from castle.storage.journal import get_recent_events
+from castle.ui.display import Display
 
 
 def _ensure_utf8() -> None:
@@ -35,7 +35,7 @@ def _execute_cli_buddy(
     """Execute a buddy action from one-shot CLI mode and record evolution/journal."""
     buddy = registry.get(buddy_id)
     if buddy is None:
-        display.print_result_cli(f"★ Buddy '{buddy_id}' isn't registered in the Mansion yet.")
+        display.print_result_cli(f"★ Buddy '{buddy_id}' isn't registered in the Castle yet.")
         return 1
 
     result = buddy.execute(action, params, cfg)
@@ -99,7 +99,7 @@ def _handle_summon_args(
     """Route `sirius summon <buddy> [args...]` or `sirius pomo [args...]` cleanly."""
     buddy = registry.get(buddy_name)
     if buddy is None:
-        display.print_result_cli(f"★ No resident named '{buddy_name}' in the Mansion.")
+        display.print_result_cli(f"★ No resident named '{buddy_name}' in the Castle.")
         return 1
     if buddy.id == "sirius":
         snapshots = registry.snapshot_all(cfg)
@@ -123,44 +123,44 @@ def _handle_summon_args(
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sirius",
-        description="★ Sirius & the Mansion — Retro CLI Cyber-Buddy Hub",
+        description="★ Sirius & the Castle — Retro CLI Cyber-Buddy Hub",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  sirius                              Open interactive BMO Mansion TUI\n"
+            "  sirius                              Open interactive BMO Castle TUI\n"
             "  sirius ask start deep focus on api  Ask Sirius in natural language\n"
-            "  sirius status                       Mansion & today's focus summary\n"
+            "  sirius status                       Castle & today's focus summary\n"
             "  sirius buddies                      List residents, rooms & cores\n"
             "  sirius pomo start -p sprint -t dev  Summon Pomo directly\n"
             "  sirius soul sirius                  Inspect Sirius's soul.md & core\n"
-            "  sirius log                          Show recent Mansion missions\n"
-            "  sirius config                       View or set Mansion settings\n"
+            "  sirius log                          Show recent Castle missions\n"
+            "  sirius config                       View or set Castle settings\n"
         ),
     )
-    parser.add_argument("-v", "--version", action="version", version=f"Mansion {__version__}")
+    parser.add_argument("-v", "--version", action="version", version=f"Castle {__version__}")
 
     sub = parser.add_subparsers(dest="command")
 
     sp_ask = sub.add_parser("ask", help="Ask Sirius to route a natural-language request")
     sp_ask.add_argument("words", nargs="+", help="Message or task for Sirius")
 
-    sub.add_parser("status", help="Show Mansion and resident summary")
-    sub.add_parser("buddies", help="List Mansion residents, rooms, souls, and cores")
+    sub.add_parser("status", help="Show Castle and resident summary")
+    sub.add_parser("buddies", help="List Castle residents, rooms, souls, and cores")
 
-    sp_summon = sub.add_parser("summon", help="Directly summon a Mansion buddy")
+    sp_summon = sub.add_parser("summon", help="Directly summon a Castle buddy")
     sp_summon.add_argument("buddy", help="Buddy name, id, or room (e.g. pomo)")
     sp_summon.add_argument("extra", nargs=argparse.REMAINDER, help="Optional arguments for buddy")
 
     sp_pomo = sub.add_parser("pomo", help="Shortcut to summon Pomo (Clocktower)")
     sp_pomo.add_argument("extra", nargs=argparse.REMAINDER, help="Optional Pomo subcommand/flags")
 
-    sp_log = sub.add_parser("log", help="View recent Mansion mission chronicle")
+    sp_log = sub.add_parser("log", help="View recent Castle mission chronicle")
     sp_log.add_argument("--limit", type=int, default=15, help="Max entries to show (default: 15)")
 
     sp_soul = sub.add_parser("soul", help="Inspect a buddy's soul.md and evolving core")
     sp_soul.add_argument("buddy", nargs="?", default="sirius", help="Buddy id or name (default: sirius)")
 
-    sp_cfg = sub.add_parser("config", help="View or set Mansion configuration")
+    sp_cfg = sub.add_parser("config", help="View or set Castle configuration")
     sp_cfg.add_argument("key", nargs="?", help="Config key to view/set")
     sp_cfg.add_argument("value", nargs="?", help="New value")
 
@@ -178,7 +178,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command is None:
         if sys.stdin.isatty() and sys.stdout.isatty():
-            from mansion.ui.app import run_interactive
+            from castle.ui.app import run_interactive
 
             run_interactive(__version__)
         else:
@@ -209,7 +209,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "soul":
         buddy = registry.get(args.buddy)
         if buddy is None:
-            display.print_result_cli(f"★ No buddy named '{args.buddy}' in the Mansion.")
+            display.print_result_cli(f"★ No buddy named '{args.buddy}' in the Castle.")
             return 1
         soul = buddy.load_soul()
         core, _ = buddy.load_core()

@@ -1,11 +1,11 @@
 """Tests for buddy soul.md parsing, customization preservation, and evolving core.json."""
 
-import mansion.buddies.core as core_mod
-from mansion.buddies.soul import get_local_soul_path, load_soul, parse_soul_markdown
+import castle.buddies.core as core_mod
+from castle.buddies.soul import get_local_soul_path, load_soul, parse_soul_markdown
 
 
 def test_soul_materializes_and_preserves_user_edits(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path))
 
     soul = load_soul("sirius")
     local_file = get_local_soul_path("sirius")
@@ -34,7 +34,7 @@ def test_soul_materializes_and_preserves_user_edits(tmp_path, monkeypatch):
 
 
 def test_core_awakening_migration_and_level_evolution(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path))
 
     core, evolved = core_mod.load_or_evolve_core(
         buddy_id="pomo",

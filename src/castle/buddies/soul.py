@@ -5,7 +5,7 @@ from importlib import resources
 from pathlib import Path
 import re
 
-from mansion.storage import get_data_dir
+from castle.storage import get_data_dir
 
 _REACTION_RE = re.compile(r"^[-*]\s*([a-zA-Z0-9_]+)\s*:\s*(.+)$")
 
@@ -38,7 +38,7 @@ class SoulProfile:
 
     @property
     def room(self) -> str:
-        return self.metadata.get("room", "Mansion Hall")
+        return self.metadata.get("room", "Castle Hall")
 
     @property
     def signature(self) -> str:
@@ -146,14 +146,14 @@ def parse_soul_markdown(text: str, buddy_id: str, source_path: Path | None = Non
 
 
 def get_local_soul_path(buddy_id: str) -> Path:
-    """Return user-customizable soul.md path inside ~/.mansion/buddies/<id>/."""
+    """Return user-customizable soul.md path inside ~/.castle/buddies/<id>/."""
     return get_data_dir() / "buddies" / buddy_id / "soul.md"
 
 
 def read_bundled_soul_text(buddy_id: str) -> str:
-    """Read the default soul.md template shipped inside the mansion package."""
+    """Read the default soul.md template shipped inside the castle package."""
     try:
-        res = resources.files("mansion.buddies").joinpath("souls", f"{buddy_id}.md")
+        res = resources.files("castle.buddies").joinpath("souls", f"{buddy_id}.md")
         if res.is_file():
             return res.read_text(encoding="utf-8")
     except (FileNotFoundError, ModuleNotFoundError, OSError):

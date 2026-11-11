@@ -1,17 +1,17 @@
-"""Tests for Mansion Rich UI screens and Sirius CLI subcommands."""
+"""Tests for Castle Rich UI screens and Sirius CLI subcommands."""
 
 from types import SimpleNamespace
 from rich.console import Console
 
-import mansion.buddies.pomo as pomo_mod
-import mansion.cli as cli_mod
-from mansion.buddies.registry import BuddyRegistry
-from mansion.storage.config import DEFAULTS
-from mansion.ui.display import Display
+import castle.buddies.pomo as pomo_mod
+import castle.cli as cli_mod
+from castle.buddies.registry import BuddyRegistry
+from castle.storage.config import DEFAULTS
+from castle.ui.display import Display
 
 
 def test_display_renders_all_screens_and_respects_narrow_width(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
     monkeypatch.setattr(pomo_mod, "resolve_pomo_command", lambda cfg=None: ["pomo"])
 
@@ -52,7 +52,7 @@ def test_display_renders_all_screens_and_respects_narrow_width(tmp_path, monkeyp
     narrow.print(display.render_goodbye_screen("★ Bye!", snapshots[0].core, target_console=narrow))
 
     out = narrow.export_text()
-    assert "THE MANSION" in out
+    assert "THE CASTLE" in out
     assert "Sirius" in out
     assert "Pomo" in out
     assert "Clocktower" in out
@@ -61,7 +61,7 @@ def test_display_renders_all_screens_and_respects_narrow_width(tmp_path, monkeyp
 
 
 def test_cli_subcommands_end_to_end(tmp_path, monkeypatch, capsys):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
     monkeypatch.setattr(pomo_mod, "resolve_pomo_command", lambda cfg=None: ["pomo"])
 

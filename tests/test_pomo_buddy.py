@@ -3,15 +3,15 @@
 from datetime import date
 import json
 
-import mansion.buddies.pomo as pomo_mod
-from mansion.buddies.pomo import PomoBuddy
+import castle.buddies.pomo as pomo_mod
+from castle.buddies.pomo import PomoBuddy
 
 
 def test_pomo_reads_pomoclk_history_and_status(tmp_path, monkeypatch):
-    mansion_dir = tmp_path / "mansion"
+    castle_dir = tmp_path / "castle"
     pomo_dir = tmp_path / "pomoclk"
     pomo_dir.mkdir()
-    monkeypatch.setenv("MANSION_DIR", str(mansion_dir))
+    monkeypatch.setenv("CASTLE_DIR", str(castle_dir))
     monkeypatch.setenv("POMOCLK_DIR", str(pomo_dir))
 
     today = date.today().isoformat()
@@ -43,7 +43,7 @@ def test_pomo_reads_pomoclk_history_and_status(tmp_path, monkeypatch):
 
 
 def test_pomo_start_builds_flags_and_handles_missing_cli(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "empty_pomo"))
     buddy = PomoBuddy()
 

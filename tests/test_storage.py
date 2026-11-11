@@ -1,13 +1,13 @@
-"""Tests for Mansion offline config and bounded journal storage."""
+"""Tests for Castle offline config and bounded journal storage."""
 
 from rich.console import Console
 
-import mansion.storage.config as config_mod
-import mansion.storage.journal as journal_mod
+import castle.storage.config as config_mod
+import castle.storage.journal as journal_mod
 
 
 def test_config_defaults_save_and_validation(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path))
 
     cfg = config_mod.load_config()
     assert cfg["user_name"] == "friend"
@@ -33,7 +33,7 @@ def test_config_defaults_save_and_validation(tmp_path, monkeypatch):
 
 
 def test_journal_logging_and_bounding(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path))
     monkeypatch.setattr(journal_mod, "MAX_JOURNAL_ENTRIES", 5)
 
     for i in range(8):

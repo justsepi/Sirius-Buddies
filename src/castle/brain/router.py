@@ -4,9 +4,9 @@ from datetime import datetime
 import re
 import shlex
 
-from mansion.brain.base import IntentPlan
-from mansion.buddies.pomo import POMO_PRESETS
-from mansion.buddies.registry import BuddyRegistry
+from castle.brain.base import IntentPlan
+from castle.buddies.pomo import POMO_PRESETS
+from castle.buddies.registry import BuddyRegistry
 
 _MINUTES_RE = re.compile(r"\b(\d{1,3})\s*(?:m|min|mins|minute|minutes)\b", re.IGNORECASE)
 _DAYS_RE = re.compile(r"\b(\d{1,3})\s*(?:d|day|days)\b", re.IGNORECASE)
@@ -126,7 +126,7 @@ class DeterministicBrain:
         user = config.get("user_name", "friend")
 
         pomo = registry.get("pomo")
-        pomo_summary = pomo.check_status(config).summary if pomo else "Mansion ready."
+        pomo_summary = pomo.check_status(config).summary if pomo else "Castle ready."
 
         if not raw:
             key = _time_greeting_key()
@@ -142,9 +142,9 @@ class DeterministicBrain:
             if cmd in ("help", "?"):
                 return IntentPlan("sirius", "help", {}, sirius_soul.react("help", user=user), mood="happy")
             if cmd in ("buddies", "residents", "roster", "rooms", "dir", "directory"):
-                return IntentPlan("sirius", "buddies", {}, f"{sirius_soul.signature} Opening Mansion Directory.", mood="happy")
+                return IntentPlan("sirius", "buddies", {}, f"{sirius_soul.signature} Opening Castle Directory.", mood="happy")
             if cmd in ("status", "today"):
-                return IntentPlan("sirius", "status", {}, f"{sirius_soul.signature} Checking Mansion pulse.", mood="happy")
+                return IntentPlan("sirius", "status", {}, f"{sirius_soul.signature} Checking Castle pulse.", mood="happy")
             if cmd in ("log", "journal", "missions"):
                 return IntentPlan("sirius", "log", {}, f"{sirius_soul.signature} Opening Mission Log.", mood="happy")
             if cmd in ("config", "settings"):
@@ -205,28 +205,28 @@ class DeterministicBrain:
         if any(k in lower for k in pomo_keywords) or bool(_MINUTES_RE.search(lower)):
             return _extract_pomo_action(raw, registry, config)
 
-        # ── Mansion-level intents ─────────────────────────────────────
-        if any(k in lower for k in ("buddies", "residents", "roster", "who lives", "mansion", "rooms", "cores")):
+        # ── Castle-level intents ─────────────────────────────────────
+        if any(k in lower for k in ("buddies", "residents", "roster", "who lives", "castle", "rooms", "cores")):
             return IntentPlan(
                 "sirius",
                 "buddies",
                 {},
-                f"{sirius_soul.signature} Here's everyone living in the Mansion (Sirius Lv.{sirius_core['level']}).",
+                f"{sirius_soul.signature} Here's everyone living in the Castle (Sirius Lv.{sirius_core['level']}).",
                 mood="happy",
             )
 
         if any(k in lower for k in ("log", "journal", "missions", "activity", "history")):
-            return IntentPlan("sirius", "log", {}, f"{sirius_soul.signature} Checking the Mansion chronicle.", mood="happy")
+            return IntentPlan("sirius", "log", {}, f"{sirius_soul.signature} Checking the Castle chronicle.", mood="happy")
 
         if any(k in lower for k in ("config", "settings")):
-            return IntentPlan("sirius", "config", {}, f"{sirius_soul.signature} Checking Mansion settings.", mood="happy")
+            return IntentPlan("sirius", "config", {}, f"{sirius_soul.signature} Checking Castle settings.", mood="happy")
 
         if any(k in lower for k in ("status", "today", "summary", "how am i doing")):
             return IntentPlan(
                 "sirius",
                 "status",
                 {},
-                f"{sirius_soul.signature} Mansion pulse for {user}: {pomo_summary}",
+                f"{sirius_soul.signature} Castle pulse for {user}: {pomo_summary}",
                 mood="happy",
             )
 

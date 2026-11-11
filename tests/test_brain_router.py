@@ -1,12 +1,12 @@
 """Tests for DeterministicBrain intent routing and soul.md-backed responses."""
 
-from mansion.brain import create_brain
-from mansion.buddies.registry import BuddyRegistry
-from mansion.storage.config import load_config
+from castle.brain import create_brain
+from castle.buddies.registry import BuddyRegistry
+from castle.storage.config import load_config
 
 
-def test_brain_routes_mansion_and_slash_commands(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+def test_brain_routes_castle_and_slash_commands(tmp_path, monkeypatch):
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
 
     cfg = load_config()
@@ -22,7 +22,7 @@ def test_brain_routes_mansion_and_slash_commands(tmp_path, monkeypatch):
 
     assert brain.plan("hello sirius", registry, cfg).action == "greet"
     assert brain.plan("/buddies", registry, cfg).action == "buddies"
-    assert brain.plan("who lives in the mansion?", registry, cfg).action == "buddies"
+    assert brain.plan("who lives in the castle?", registry, cfg).action == "buddies"
     assert brain.plan("/log", registry, cfg).action == "log"
     assert brain.plan("soul pomo", registry, cfg).params["buddy"] == "pomo"
     assert brain.plan("goodnight", registry, cfg).action == "quit"
@@ -34,7 +34,7 @@ def test_brain_routes_mansion_and_slash_commands(tmp_path, monkeypatch):
 
 
 def test_brain_extracts_pomo_presets_minutes_and_tasks(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
 
     cfg = load_config()

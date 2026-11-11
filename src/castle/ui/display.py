@@ -1,4 +1,4 @@
-"""Rich BMO-inspired retro terminal UI and CLI output helpers for Sirius & the Mansion."""
+"""Rich BMO-inspired retro terminal UI and CLI output helpers for Sirius & the Castle."""
 
 from rich import box
 from rich.align import Align
@@ -7,9 +7,9 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from mansion.buddies.base import BuddyResult
-from mansion.buddies.registry import BuddySnapshot
-from mansion.buddies.soul import SoulProfile
+from castle.buddies.base import BuddyResult
+from castle.buddies.registry import BuddySnapshot
+from castle.buddies.soul import SoulProfile
 
 console = Console()
 
@@ -17,10 +17,10 @@ PANEL_WIDTH = 70
 
 HOME_MENU = [
     ("pomo", "1", "Summon Pomo", "Clocktower · Focus timer & stats"),
-    ("buddies", "2", "Mansion Directory", "Residents, rooms, souls & cores"),
+    ("buddies", "2", "Castle Directory", "Residents, rooms, souls & cores"),
     ("log", "3", "Mission Log", "Recent dispatches & evolutions"),
     ("config", "4", "Sirius Settings", "Name, brain, animations & paths"),
-    ("quit", "q", "Sleep / Quit", "Rest the Mansion console"),
+    ("quit", "q", "Sleep / Quit", "Rest the Castle console"),
 ]
 
 CONFIG_ITEMS = [
@@ -112,7 +112,7 @@ def _render_result_table(result: BuddyResult, max_width: int) -> Table | None:
 
 
 class Display:
-    """Responsible for rendering all Mansion TUI screens and CLI summaries."""
+    """Responsible for rendering all Castle TUI screens and CLI summaries."""
 
     def frame_center(self, renderable, target_console: Console | None = None):
         c = target_console or console
@@ -132,7 +132,7 @@ class Display:
         frame: int = 0,
         target_console: Console | None = None,
     ) -> Panel:
-        """Render the BMO-inspired Mansion Hub (face + speech + menu + prompt)."""
+        """Render the BMO-inspired Castle Hub (face + speech + menu + prompt)."""
         width = _panel_width(72, target_console)
         inner_w = max(28, width - 6)
 
@@ -181,7 +181,7 @@ class Display:
         body.add_row(Text(""))
 
         menu_badge = " [ACTIVE]" if focus_zone == "menu" else ""
-        menu_hdr = Text(f"Mansion Rooms{menu_badge}", style="bold bright_yellow" if focus_zone == "menu" else "dim bright_cyan")
+        menu_hdr = Text(f"Castle Rooms{menu_badge}", style="bold bright_yellow" if focus_zone == "menu" else "dim bright_cyan")
         body.add_row(menu_hdr)
 
         for idx, (_, hotkey, label, desc) in enumerate(HOME_MENU):
@@ -219,7 +219,7 @@ class Display:
 
         return Panel(
             body,
-            title=f"[bold bright_cyan]★ THE MANSION v{version} ★[/]",
+            title=f"[bold bright_cyan]★ THE CASTLE v{version} ★[/]",
             border_style="bright_cyan",
             width=width,
             padding=(1, 2),
@@ -232,7 +232,7 @@ class Display:
         frame: int = 0,
         target_console: Console | None = None,
     ) -> Panel:
-        """Render the Mansion Directory showing every buddy's room, soul, and evolving core."""
+        """Render the Castle Directory showing every buddy's room, soul, and evolving core."""
         width = _panel_width(74, target_console)
         inner_w = max(28, width - 6)
 
@@ -278,7 +278,7 @@ class Display:
 
         return Panel(
             grid,
-            title="[bold bright_cyan]★ MANSION DIRECTORY ★[/]",
+            title="[bold bright_cyan]★ CASTLE DIRECTORY ★[/]",
             border_style="bright_cyan",
             width=width,
             padding=(1, 2),
@@ -332,7 +332,7 @@ class Display:
         events: list[dict],
         target_console: Console | None = None,
     ) -> Panel:
-        """Render recent Mansion mission chronicle."""
+        """Render recent Castle mission chronicle."""
         width = _panel_width(74, target_console)
         inner_w = max(28, width - 6)
 
@@ -360,7 +360,7 @@ class Display:
 
         return Panel(
             content,
-            title="[bold bright_cyan]★ MANSION MISSION LOG ★[/]",
+            title="[bold bright_cyan]★ CASTLE MISSION LOG ★[/]",
             border_style="bright_cyan",
             width=width,
             padding=(1, 2),
@@ -375,7 +375,7 @@ class Display:
         status_msg: str = "",
         target_console: Console | None = None,
     ) -> Panel:
-        """Render interactive Mansion settings editor."""
+        """Render interactive Castle settings editor."""
         width = _panel_width(70, target_console)
         inner_w = max(28, width - 6)
 
@@ -420,7 +420,7 @@ class Display:
         sirius_core: dict,
         target_console: Console | None = None,
     ) -> Panel:
-        """Render BMO-style goodbye card when leaving the Mansion."""
+        """Render BMO-style goodbye card when leaving the Castle."""
         width = _panel_width(64, target_console)
         face = build_sirius_face(mood="sleeping", frame=0)
         body = Table.grid(padding=(0, 2))
@@ -453,7 +453,7 @@ class Display:
 
     def print_buddies_cli(self, snapshots: list[BuddySnapshot], target_console: Console | None = None) -> None:
         out = target_console or console
-        table = Table(title="Mansion Residents", border_style="bright_cyan", header_style="bold bright_cyan")
+        table = Table(title="Castle Residents", border_style="bright_cyan", header_style="bold bright_cyan")
         table.add_column("Buddy", style="bold bright_white")
         table.add_column("Room", style="bright_cyan")
         table.add_column("Core", style="bright_yellow")
@@ -475,9 +475,9 @@ class Display:
     def print_log_cli(self, events: list[dict], target_console: Console | None = None) -> None:
         out = target_console or console
         if not events:
-            out.print("\n  [dim]No Mansion missions logged yet.[/]\n")
+            out.print("\n  [dim]No Castle missions logged yet.[/]\n")
             return
-        table = Table(title="Mansion Mission Log", border_style="bright_cyan", header_style="bold bright_cyan")
+        table = Table(title="Castle Mission Log", border_style="bright_cyan", header_style="bold bright_cyan")
         table.add_column("Timestamp", style="dim")
         table.add_column("Buddy", style="bright_cyan")
         table.add_column("Action", style="bright_yellow")

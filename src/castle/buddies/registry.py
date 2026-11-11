@@ -1,11 +1,11 @@
-"""Registry of Mansion residents (Sirius + specialist cyber buddies)."""
+"""Registry of Castle residents (Sirius + specialist cyber buddies)."""
 
 from dataclasses import dataclass
 
-from mansion.buddies.base import BaseBuddy, BuddyStatus
-from mansion.buddies.pomo import PomoBuddy
-from mansion.buddies.sirius import SiriusBuddy
-from mansion.buddies.soul import SoulProfile
+from castle.buddies.base import BaseBuddy, BuddyStatus
+from castle.buddies.pomo import PomoBuddy
+from castle.buddies.sirius import SiriusBuddy
+from castle.buddies.soul import SoulProfile
 
 
 @dataclass
@@ -20,7 +20,7 @@ class BuddySnapshot:
 
 
 class BuddyRegistry:
-    """Manages Sirius and all resident cyber buddies in the Mansion."""
+    """Manages Sirius and all resident cyber buddies in the Castle."""
 
     def __init__(self) -> None:
         self._sirius = SiriusBuddy()

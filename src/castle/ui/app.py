@@ -1,21 +1,21 @@
-"""Interactive BMO-style TUI controller for Sirius & the Mansion."""
+"""Interactive BMO-style TUI controller for Sirius & the Castle."""
 
 import subprocess
 from rich.live import Live
 
-from mansion.brain import create_brain, record_mission_outcome
-from mansion.buddies.base import BuddyResult
-from mansion.buddies.registry import BuddyRegistry
-from mansion.storage.config import (
+from castle.brain import create_brain, record_mission_outcome
+from castle.buddies.base import BuddyResult
+from castle.buddies.registry import BuddyRegistry
+from castle.storage.config import (
     load_config,
     parse_config_value,
     reset_config,
     save_config,
     toggle_or_cycle_config,
 )
-from mansion.storage.journal import get_recent_events
-from mansion.ui.display import CONFIG_ITEMS, HOME_MENU, Display, console
-from mansion.ui.keys import (
+from castle.storage.journal import get_recent_events
+from castle.ui.display import CONFIG_ITEMS, HOME_MENU, Display, console
+from castle.ui.keys import (
     PromptBuffer,
     flush_keys,
     keyboard_session,
@@ -77,7 +77,7 @@ def _run_directory_screen(
     registry: BuddyRegistry,
     cfg: dict,
 ) -> tuple[str, str]:
-    """Browse Mansion residents, view souls, or summon a buddy. Returns (route, buddy_id)."""
+    """Browse Castle residents, view souls, or summon a buddy. Returns (route, buddy_id)."""
     selected = 0
     frame = 0
     last_size = console.size
@@ -220,7 +220,7 @@ def _summon_buddy_interactive(
     """Execute a buddy action from the TUI and return (sirius_reply, mood, inline_result)."""
     buddy = registry.get(buddy_id)
     if buddy is None:
-        return f"★ Buddy '{buddy_id}' isn't in the Mansion yet.", "curious", None
+        return f"★ Buddy '{buddy_id}' isn't in the Castle yet.", "curious", None
 
     result = buddy.execute(action, params, cfg)
     if not result.ok:
@@ -241,7 +241,7 @@ def _summon_buddy_interactive(
             ok=ok,
         )
         soul = buddy.load_soul()
-        msg = soul.react("success", detail="Returned to the Mansion!")
+        msg = soul.react("success", detail="Returned to the Castle!")
         if levelups:
             msg = f"{msg}\n{levelups[0]}"
         return msg, "happy", None
@@ -263,7 +263,7 @@ def _summon_buddy_interactive(
 
 
 def run_interactive(version: str) -> None:
-    """Launch the BMO-inspired Mansion TUI Hub with Sirius and Pomo."""
+    """Launch the BMO-inspired Castle TUI Hub with Sirius and Pomo."""
     display = Display()
     registry = BuddyRegistry()
     cfg = load_config()

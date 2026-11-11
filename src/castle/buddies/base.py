@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
-from mansion.buddies.core import DEFAULT_RANKS, load_or_evolve_core, record_mission
-from mansion.buddies.soul import SoulProfile, load_soul
+from castle.buddies.core import DEFAULT_RANKS, load_or_evolve_core, record_mission
+from castle.buddies.soul import SoulProfile, load_soul
 
 
 @dataclass(frozen=True)
@@ -19,7 +19,7 @@ class ActionSpec:
 
 @dataclass(frozen=True)
 class BuddyStatus:
-    """Live availability and short summary for a Mansion buddy."""
+    """Live availability and short summary for a Castle buddy."""
 
     available: bool
     state_label: str
@@ -41,7 +41,7 @@ class BuddyResult:
 
 
 class BaseBuddy(ABC):
-    """Contract implemented by Sirius and every specialist Mansion cyber buddy."""
+    """Contract implemented by Sirius and every specialist Castle cyber buddy."""
 
     id: str = ""
     default_name: str = ""
@@ -94,7 +94,7 @@ class BaseBuddy(ABC):
 
     @abstractmethod
     def check_status(self, config: dict) -> BuddyStatus:
-        """Return live availability and concise status for the Mansion Directory."""
+        """Return live availability and concise status for the Castle Directory."""
 
     @abstractmethod
     def execute(self, action: str, params: dict, config: dict) -> BuddyResult:

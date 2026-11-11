@@ -1,15 +1,15 @@
-"""Bounded mission chronicle stored in ~/.mansion/journal.json."""
+"""Bounded mission chronicle stored in ~/.castle/journal.json."""
 
 from datetime import datetime
 from pathlib import Path
 
-from mansion.storage import get_data_dir, read_json, write_json
+from castle.storage import get_data_dir, read_json, write_json
 
 MAX_JOURNAL_ENTRIES = 300
 
 
 def get_journal_file() -> Path:
-    """Return path to journal.json inside the active Mansion data directory."""
+    """Return path to journal.json inside the active Castle data directory."""
     return get_data_dir() / "journal.json"
 
 

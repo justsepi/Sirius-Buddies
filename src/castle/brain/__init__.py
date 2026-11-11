@@ -2,11 +2,11 @@
 
 from dataclasses import dataclass, field
 
-from mansion.brain.base import BrainProvider, IntentPlan
-from mansion.brain.router import DeterministicBrain
-from mansion.buddies.base import BuddyResult
-from mansion.buddies.registry import BuddyRegistry
-from mansion.storage.journal import log_event
+from castle.brain.base import BrainProvider, IntentPlan
+from castle.brain.router import DeterministicBrain
+from castle.buddies.base import BuddyResult
+from castle.buddies.registry import BuddyRegistry
+from castle.storage.journal import log_event
 
 
 @dataclass

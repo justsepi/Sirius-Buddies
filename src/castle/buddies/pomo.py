@@ -1,4 +1,4 @@
-"""Pomo resident — adopts standalone pomoclk into the Mansion Clocktower."""
+"""Pomo resident — adopts standalone pomoclk into the Castle Clocktower."""
 
 from datetime import date, timedelta
 import importlib.util
@@ -8,8 +8,8 @@ import shlex
 import shutil
 import sys
 
-from mansion.buddies.base import ActionSpec, BaseBuddy, BuddyResult, BuddyStatus
-from mansion.storage import read_json
+from castle.buddies.base import ActionSpec, BaseBuddy, BuddyResult, BuddyStatus
+from castle.storage import read_json
 
 POMO_PRESETS = ("classic", "quick", "deep", "sprint")
 
@@ -160,7 +160,7 @@ class PomoBuddy(BaseBuddy):
             available=False,
             state_label="not installed",
             summary=summary,
-            detail="Install pomoclk or set `pomo_command` in Mansion config.",
+            detail="Install pomoclk or set `pomo_command` in Castle config.",
         )
 
     def execute(self, action: str, params: dict, config: dict) -> BuddyResult:

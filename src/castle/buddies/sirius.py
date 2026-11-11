@@ -1,15 +1,15 @@
 """Sirius — Master & Brain resident definition."""
 
-from mansion.buddies.base import ActionSpec, BaseBuddy, BuddyResult, BuddyStatus
+from castle.buddies.base import ActionSpec, BaseBuddy, BuddyResult, BuddyStatus
 
 
 class SiriusBuddy(BaseBuddy):
-    """Master resident of the Mansion who coordinates all other buddies."""
+    """Master resident of the Castle who coordinates all other buddies."""
 
     id = "sirius"
     default_name = "Sirius"
     default_room = "Master Study"
-    task_summary = "Mansion brain, orchestration, & core keeper"
+    task_summary = "Castle brain, orchestration, & core keeper"
     aliases = ("sirius", "master", "study", "brain")
     CORE_VERSION = 1
     RANKS = (
@@ -20,10 +20,10 @@ class SiriusBuddy(BaseBuddy):
         (400, "Luminary"),
     )
     actions = (
-        ActionSpec("status", "Show Mansion overview and resident summaries"),
+        ActionSpec("status", "Show Castle overview and resident summaries"),
         ActionSpec("buddies", "Inspect all residents, rooms, and evolving cores"),
-        ActionSpec("log", "Show recent Mansion mission chronicle"),
-        ActionSpec("help", "Explain what Sirius and the Mansion can do"),
+        ActionSpec("log", "Show recent Castle mission chronicle"),
+        ActionSpec("help", "Explain what Sirius and the Castle can do"),
     )
 
     def check_status(self, config: dict) -> BuddyStatus:

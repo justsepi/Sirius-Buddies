@@ -1,9 +1,9 @@
-"""Mansion global configuration stored in ~/.mansion/config.json."""
+"""Castle global configuration stored in ~/.castle/config.json."""
 
 from pathlib import Path
 from rich.console import Console
 
-from mansion.storage import get_data_dir, read_json, write_json
+from castle.storage import get_data_dir, read_json, write_json
 
 DEFAULTS = {
     "user_name": "friend",
@@ -18,7 +18,7 @@ VALID_BRAIN_PROVIDERS = ("deterministic", "ollama")
 
 
 def get_config_file() -> Path:
-    """Return path to config.json inside the active Mansion data directory."""
+    """Return path to config.json inside the active Castle data directory."""
     return get_data_dir() / "config.json"
 
 
@@ -74,10 +74,10 @@ def set_config(key: str, value: str, console: Console | None = None) -> bool:
 
 
 def show_config(key: str | None = None, console: Console | None = None) -> None:
-    """Print current Mansion settings."""
+    """Print current Castle settings."""
     out = console or Console()
     cfg = load_config()
-    out.print("\n  [bright_cyan]★  Mansion Config[/]\n")
+    out.print("\n  [bright_cyan]★  Castle Config[/]\n")
     if key:
         if key in cfg:
             out.print(f"  {key} = {cfg[key]}")
@@ -104,7 +104,7 @@ def toggle_or_cycle_config(cfg: dict, key: str) -> dict:
 
 
 def reset_config() -> dict:
-    """Restore all Mansion settings to DEFAULTS."""
+    """Restore all Castle settings to DEFAULTS."""
     fresh = dict(DEFAULTS)
     save_config(fresh)
     return fresh

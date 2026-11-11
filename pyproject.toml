@@ -3,9 +3,9 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mansion"
-version = "0.1.0"
-description = "Sirius & the Mansion — Cross-platform retro CLI cyber-buddy hub"
+name = "castle"
+version = "0.1.1"
+description = "Sirius & the Castle — Cross-platform retro CLI cyber-buddy hub"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
@@ -16,11 +16,11 @@ dependencies = [
 dev = ["pytest>=7.0"]
 
 [project.scripts]
-sirius = "mansion.cli:main"
-mansion = "mansion.cli:main"
+sirius = "castle.cli:main"
+castle = "castle.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
 
 [tool.setuptools.package-data]
-"mansion.buddies" = ["souls/*.md"]
+"castle.buddies" = ["souls/*.md"]

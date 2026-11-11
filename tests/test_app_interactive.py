@@ -1,17 +1,17 @@
-"""Tests for Mansion interactive TUI controller and buddy handoff flows."""
+"""Tests for Castle interactive TUI controller and buddy handoff flows."""
 
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from mansion.buddies.registry import BuddyRegistry
-import mansion.buddies.pomo as pomo_mod
-import mansion.storage.config as config_mod
-import mansion.ui.app as app_mod
-from mansion.ui.display import Display
+from castle.buddies.registry import BuddyRegistry
+import castle.buddies.pomo as pomo_mod
+import castle.storage.config as config_mod
+import castle.ui.app as app_mod
+from castle.ui.display import Display
 
 
 def test_directory_log_soul_and_config_screens(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
     monkeypatch.setattr(pomo_mod, "resolve_pomo_command", lambda cfg=None: ["pomo"])
 
@@ -54,7 +54,7 @@ def test_directory_log_soul_and_config_screens(tmp_path, monkeypatch):
 
 
 def test_summon_buddy_interactive_handoff_and_run_loop(tmp_path, monkeypatch):
-    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("CASTLE_DIR", str(tmp_path / "castle"))
     monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
     monkeypatch.setattr(pomo_mod, "resolve_pomo_command", lambda cfg=None: ["pomo"])
 

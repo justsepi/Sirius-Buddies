@@ -1,4 +1,4 @@
-"""Offline JSON storage helpers for ~/.mansion/."""
+"""Offline JSON storage helpers for ~/.castle/."""
 
 import json
 import os
@@ -7,9 +7,9 @@ from typing import Any
 
 
 def get_data_dir() -> Path:
-    """Return Mansion's data directory (~/.mansion or MANSION_DIR env override)."""
-    override = os.environ.get("MANSION_DIR", "").strip()
-    return Path(override) if override else (Path.home() / ".mansion")
+    """Return Castle's data directory (~/.castle or CASTLE_DIR env override)."""
+    override = os.environ.get("CASTLE_DIR", "").strip()
+    return Path(override) if override else (Path.home() / ".castle")
 
 
 def read_json(path: Path, default: Any) -> Any:

@@ -3,7 +3,7 @@
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from mansion.buddies.registry import BuddyRegistry
+from castle.buddies.registry import BuddyRegistry
 
 
 @dataclass
@@ -24,4 +24,4 @@ class BrainProvider(Protocol):
     name: str
 
     def plan(self, text: str, registry: BuddyRegistry, config: dict) -> IntentPlan:
-        """Interpret `text` into an IntentPlan targeting Sirius or a Mansion buddy."""
+        """Interpret `text` into an IntentPlan targeting Sirius or a Castle buddy."""
