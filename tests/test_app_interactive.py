@@ -1,0 +1,110 @@
+"""Tests for Mansion interactive TUI controller and buddy handoff flows."""
+
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
+
+from mansion.buddies.registry import BuddyRegistry
+import mansion.buddies.pomo as pomo_mod
+import mansion.storage.config as config_mod
+import mansion.ui.app as app_mod
+from mansion.ui.display import Display
+
+
+def test_directory_log_soul_and_config_screens(tmp_path, monkeypatch):
+    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
+    monkeypatch.setattr(pomo_mod, "resolve_pomo_command", lambda cfg=None: ["pomo"])
+
+    display = Display()
+    live = MagicMock()
+    registry = BuddyRegistry()
+    cfg = config_mod.load_config()
+
+    # Directory: select Pomo (DOWN) then press 's' to inspect Pomo's soul.md
+    with (
+        patch.object(app_mod, "flush_keys"),
+        patch.object(app_mod, "read_key", side_effect=["DOWN", "s"]),
+    ):
+        route, picked = app_mod._run_directory_screen(display, live, registry, cfg)
+    assert (route, picked) == ("soul", "pomo")
+
+    # Directory: select Pomo then ENTER -> summon_pomo
+    with (
+        patch.object(app_mod, "flush_keys"),
+        patch.object(app_mod, "read_key", side_effect=["DOWN", "ENTER"]),
+    ):
+        route, picked = app_mod._run_directory_screen(display, live, registry, cfg)
+    assert (route, picked) == ("summon_pomo", "pomo")
+
+    # Soul screen: ESC goes back to home
+    with (
+        patch.object(app_mod, "flush_keys"),
+        patch.object(app_mod, "read_key", side_effect=["ESC"]),
+    ):
+        assert app_mod._run_soul_screen(display, live, registry, "pomo") == "home"
+
+    # Config screen: DOWN -> ENTER cycles brain_provider to 'ollama', then 'b' saves and returns
+    with (
+        patch.object(app_mod, "flush_keys"),
+        patch.object(app_mod, "read_key", side_effect=["DOWN", "ENTER", "b"]),
+    ):
+        updated = app_mod._run_config_screen(display, live)
+    assert updated["brain_provider"] == "ollama"
+    assert config_mod.load_config()["brain_provider"] == "ollama"
+
+
+def test_summon_buddy_interactive_handoff_and_run_loop(tmp_path, monkeypatch):
+    monkeypatch.setenv("MANSION_DIR", str(tmp_path / "mansion"))
+    monkeypatch.setenv("POMOCLK_DIR", str(tmp_path / "pomo"))
+    monkeypatch.setattr(pomo_mod, "resolve_pomo_command", lambda cfg=None: ["pomo"])
+
+    registry = BuddyRegistry()
+    cfg = config_mod.load_config()
+    live = MagicMock()
+
+    # Interactive command handoff suspends Live and invokes subprocess
+    with patch.object(app_mod.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as mock_run:
+        reply, mood, inline = app_mod._summon_buddy_interactive(
+            live,
+            registry,
+            cfg,
+            "pomo",
+            "start",
+            {"preset": "sprint", "task": "ui"},
+        )
+    mock_run.assert_called_once_with(["pomo", "start", "-p", "sprint", "-t", "ui"])
+    live.stop.assert_called_once()
+    live.start.assert_called_once()
+    assert mood == "happy"
+    assert inline is None
+    assert "Clocktower" in reply
+
+    # Full run_interactive loop: type "pomo status", Enter, Tab to menu, 'q' quit
+    seq = iter([*"pomo status", "ENTER", "TAB", "q"])
+
+    class DummyLive:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def update(self, *args, **kwargs):
+            pass
+
+        def stop(self):
+            pass
+
+        def start(self, *args, **kwargs):
+            pass
+
+    with (
+        patch.object(app_mod, "Live", DummyLive),
+        patch.object(app_mod, "flush_keys"),
+        patch.object(app_mod, "read_key", side_effect=lambda timeout=0.25: next(seq)),
+        patch.object(app_mod.console, "print"),
+    ):
+        app_mod.run_interactive("0.1.0")
