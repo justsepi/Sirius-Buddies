@@ -12,25 +12,25 @@ def test_soul_materializes_and_preserves_user_edits(tmp_path, monkeypatch):
     assert local_file.exists()
     assert soul.name == "Sirius"
     assert soul.room == "Master Study"
-    assert "Hey Sepi" in soul.react("greet", user="Sepi", summary="All good.")
+    greeted = soul.react("greet", variant_index=0, user="Sepi", summary="All good.")
+    assert "Sepi" in greeted
+    assert "dude" in greeted.lower()
 
     # Customizing local soul.md persists across subsequent loads
     custom_md = local_file.read_text(encoding="utf-8").replace(
-        "Hey {user}!",
-        "Yo {user}, star-deck ready!",
+        "Yo {user}, dude",
+        "Yo {user}, cosmic deck hot",
     )
     local_file.write_text(custom_md, encoding="utf-8")
 
     reloaded = load_soul("sirius")
-    assert "Yo Sepi, star-deck ready!" in reloaded.react("greet", user="Sepi", summary="Ready.")
+    assert "Yo Sepi, cosmic deck hot" in reloaded.react(
+        "greet", variant_index=0, user="Sepi", summary="Ready."
+    )
     # Missing placeholder never raises KeyError
     assert "{missing_var}" in parse_soul_markdown(
         "## Reactions\n- hi: \"Hi {missing_var}\"\n", "x"
     ).react("hi")
-
-    prompt = reloaded.to_system_prompt({"level": 2, "rank": "Lantern", "missions_completed": 5, "memory": {"a": 1}})
-    assert "Sirius" in prompt
-    assert "Lv.2 Lantern" in prompt
 
 
 def test_core_awakening_migration_and_level_evolution(tmp_path, monkeypatch):

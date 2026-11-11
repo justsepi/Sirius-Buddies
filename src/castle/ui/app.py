@@ -1,10 +1,12 @@
-"""Interactive BMO-style TUI controller for Sirius & the Castle."""
+"""Interactive pure-keyboard TUI controller for Sirius & the Castle."""
 
+import socket
 import subprocess
+import time
 from rich.live import Live
 
-from castle.brain import create_brain, record_mission_outcome
 from castle.buddies.base import BuddyResult
+from castle.buddies.missions import record_mission_outcome
 from castle.buddies.registry import BuddyRegistry
 from castle.storage.config import (
     load_config,
@@ -16,12 +18,12 @@ from castle.storage.config import (
 from castle.storage.journal import get_recent_events
 from castle.ui.display import CONFIG_ITEMS, HOME_MENU, Display, console
 from castle.ui.keys import (
-    PromptBuffer,
     flush_keys,
     keyboard_session,
     pause_keyboard_session,
     read_key,
 )
+from castle.ui.sirius_art import SIRIUS_MOODS
 
 
 def _sync_resize(last_size):
@@ -44,6 +46,315 @@ def _launch_interactive_cmd(live: Live, cmd: list[str]) -> tuple[bool, str]:
         console.clear()
         live.start(refresh=True)
         flush_keys()
+
+
+def _run_buddy_action(
+    registry: BuddyRegistry,
+    cfg: dict,
+    buddy_id: str,
+    action: str,
+    params: dict | None = None,
+    log_mission: bool = True,
+) -> tuple[str, str, BuddyResult | None]:
+    """Execute a buddy action and optionally log mission/XP."""
+    buddy = registry.get(buddy_id) or registry.sirius
+    res = buddy.execute(action, params or {}, cfg)
+    msg = res.message
+    if log_mission and res.ok:
+        levelups = record_mission_outcome(
+            buddy_id=buddy.id,
+            action=action,
+            summary=res.message,
+            registry=registry,
+            xp_gain=int(res.meta.get("xp_gain", 2)),
+            memory_updates=res.meta.get("memory_updates"),
+            machine_updates=res.meta.get("machine_updates"),
+            ok=True,
+        )
+        if levelups:
+            msg = f"{msg}\n{levelups[0]}"
+    return msg, res.mood, res
+
+
+def _run_helper_screen(
+    display: Display,
+    live: Live,
+    registry: BuddyRegistry,
+    cfg: dict,
+    helper_action: str,
+) -> str:
+    """Interactive result viewer for Pulse, Repo Scout, Port Inspector & Cache Sweep."""
+    titles = {
+        "pulse": "SYSTEM PULSE",
+        "repo": "REPO & GIT SCOUT",
+        "ports": "PORT INSPECTOR",
+        "sweep": "CACHE SWEEP",
+    }
+    title = titles.get(helper_action, helper_action.upper())
+    show_shadow = bool(cfg.get("show_shadow", True))
+
+    def _run_scan(clean: bool = False):
+        return _run_buddy_action(
+            registry,
+            cfg,
+            "sirius",
+            helper_action,
+            {"clean": clean} if helper_action == "sweep" and clean else {},
+            log_mission=True,
+        )
+
+    sirius_reply, sirius_mood, result = _run_scan()
+    confirm_clean = False
+    frame = 0
+    last_size = console.size
+    flush_keys()
+
+    while True:
+        last_size = _sync_resize(last_size)
+        anim_frame = (frame // 2) if cfg.get("animations_enabled", True) else 0
+        report = (result.meta or {}).get("report") if result else None
+        can_clean = bool(
+            helper_action == "sweep"
+            and report is not None
+            and getattr(report, "safe_count", 0) > 0
+        )
+
+        confirm_prompt = ""
+        if confirm_clean and can_clean:
+            confirm_prompt = (
+                f"Vaporize {report.safe_count} safe cache item(s)? Press [y] to confirm, [n/Esc] to cancel."
+            )
+        extra_hint = "c sweep safe caches" if can_clean and not confirm_clean else ""
+
+        live.update(
+            display.frame_center(
+                display.render_helper_screen(
+                    title=title,
+                    sirius_reply=sirius_reply,
+                    sirius_mood=sirius_mood,
+                    result=result,
+                    frame=anim_frame,
+                    show_shadow=show_shadow,
+                    confirm_prompt=confirm_prompt,
+                    extra_hint=extra_hint,
+                )
+            )
+        )
+        key = read_key(timeout=0.25)
+        frame += 1
+        if key is None:
+            continue
+        low = key.lower()
+
+        if confirm_clean:
+            if key == "CTRL_C":
+                return "quit"
+            if low == "y":
+                sirius_reply, sirius_mood, result = _run_scan(clean=True)
+                confirm_clean = False
+            elif key == "ESC" or low in ("n", "b"):
+                confirm_clean = False
+                sirius_reply = "✦ Chill—kept everything intact, dude."
+                sirius_mood = "chill"
+            continue
+
+        if key == "CTRL_C" or low == "q":
+            return "quit"
+        if key == "ESC" or low == "b":
+            return "home"
+        if low == "r":
+            sirius_reply, sirius_mood, result = _run_scan()
+        elif low == "p":
+            sirius_reply, sirius_mood, _ = _run_buddy_action(registry, cfg, "sirius", "poke", log_mission=False)
+        elif low == "c" and can_clean:
+            confirm_clean = True
+
+
+def _run_timer_screen(
+    display: Display,
+    live: Live,
+    registry: BuddyRegistry,
+    cfg: dict,
+    initial_minutes: int = 25,
+    auto_start: bool = False,
+) -> str:
+    """Built-in pure-offline keyboard countdown timer hosted by Sirius."""
+    minutes_set = max(1, min(180, initial_minutes))
+    remaining_secs = minutes_set * 60
+    running = auto_start
+    finished = False
+    last_tick = time.monotonic()
+    frame = 0
+    last_size = console.size
+    show_shadow = bool(cfg.get("show_shadow", True))
+    flush_keys()
+
+    while True:
+        last_size = _sync_resize(last_size)
+        now = time.monotonic()
+        if running and not finished:
+            elapsed = now - last_tick
+            if elapsed >= 1.0:
+                step = int(elapsed)
+                last_tick += step
+                remaining_secs = max(0, remaining_secs - step)
+                if remaining_secs == 0:
+                    running = False
+                    finished = True
+                    try:
+                        print("\a", end="", flush=True)
+                    except Exception:
+                        pass
+                    record_mission_outcome(
+                        buddy_id="sirius",
+                        action="timer",
+                        summary=f"Quick timer {minutes_set}m completed",
+                        registry=registry,
+                        xp_gain=8,
+                        ok=True,
+                    )
+        else:
+            last_tick = now
+
+        anim_frame = (frame // 2) if cfg.get("animations_enabled", True) else 0
+        live.update(
+            display.frame_center(
+                display.render_timer_screen(
+                    minutes_set=minutes_set,
+                    remaining_secs=remaining_secs,
+                    running=running,
+                    finished=finished,
+                    frame=anim_frame,
+                    show_shadow=show_shadow,
+                )
+            )
+        )
+        key = read_key(timeout=0.25)
+        frame += 1
+        if key is None:
+            continue
+        low = key.lower()
+
+        if key == "CTRL_C" or low == "q":
+            return "quit"
+        if key == "ESC" or low == "b":
+            return "home"
+        if key in ("SPACE", "ENTER"):
+            if finished:
+                remaining_secs = minutes_set * 60
+                finished = False
+                running = True
+                last_tick = time.monotonic()
+            else:
+                running = not running
+                last_tick = time.monotonic()
+        elif low == "r":
+            running = False
+            finished = False
+            remaining_secs = minutes_set * 60
+        elif not running and key in ("1", "2", "3", "4"):
+            presets = {"1": 5, "2": 15, "3": 25, "4": 45}
+            minutes_set = presets[key]
+            remaining_secs = minutes_set * 60
+            finished = False
+        elif not running and key in ("+", "="):
+            minutes_set = min(180, minutes_set + 1)
+            remaining_secs = minutes_set * 60
+            finished = False
+        elif not running and key in ("-", "_"):
+            minutes_set = max(1, minutes_set - 1)
+            remaining_secs = minutes_set * 60
+            finished = False
+
+
+def _run_moods_screen(display: Display, live: Live, cfg: dict) -> str:
+    """Browse all of Sirius's CLI expressions with keyboard arrows."""
+    mood_idx = 0
+    frame = 0
+    last_size = console.size
+    show_shadow = bool(cfg.get("show_shadow", True))
+    flush_keys()
+
+    while True:
+        last_size = _sync_resize(last_size)
+        anim_frame = (frame // 2) if cfg.get("animations_enabled", True) else 0
+        live.update(
+            display.frame_center(
+                display.render_moods_screen(
+                    mood_idx=mood_idx,
+                    frame=anim_frame,
+                    show_shadow=show_shadow,
+                )
+            )
+        )
+        key = read_key(timeout=0.25)
+        frame += 1
+        if key is None:
+            continue
+        low = key.lower()
+        if key == "CTRL_C" or low == "q":
+            return "quit"
+        if key == "ESC" or low == "b":
+            return "home"
+        if key in ("LEFT", "UP") or low in ("h", "k"):
+            mood_idx = (mood_idx - 1) % len(SIRIUS_MOODS)
+        elif key in ("RIGHT", "DOWN", "SPACE", "ENTER") or low in ("l", "j"):
+            mood_idx = (mood_idx + 1) % len(SIRIUS_MOODS)
+
+
+def _run_toys_screen(
+    display: Display,
+    live: Live,
+    registry: BuddyRegistry,
+    cfg: dict,
+) -> str:
+    """Interactive Cosmic Flip, Dice Roll, Oracle, Snack & Poke deck."""
+    sirius_reply = "✦ Pick somethin', dude—coin flip, dice roll, cosmic call, or snacks."
+    sirius_mood = "smug"
+    headline = "Buddy Deck"
+    frame = 0
+    last_size = console.size
+    show_shadow = bool(cfg.get("show_shadow", True))
+    flush_keys()
+
+    while True:
+        last_size = _sync_resize(last_size)
+        anim_frame = (frame // 2) if cfg.get("animations_enabled", True) else 0
+        live.update(
+            display.frame_center(
+                display.render_toys_screen(
+                    sirius_reply=sirius_reply,
+                    sirius_mood=sirius_mood,
+                    headline=headline,
+                    frame=anim_frame,
+                    show_shadow=show_shadow,
+                )
+            )
+        )
+        key = read_key(timeout=0.25)
+        frame += 1
+        if key is None:
+            continue
+        low = key.lower()
+        if key == "CTRL_C" or low == "q":
+            return "quit"
+        if key == "ESC" or low == "b":
+            return "home"
+
+        action_map = {
+            "1": ("flip", {}),
+            "2": ("roll", {"sides": 20}),
+            "3": ("roll", {"sides": 6}),
+            "4": ("oracle", {}),
+            "f": ("snack", {}),
+            "p": ("poke", {}),
+        }
+        if low in action_map:
+            act, params = action_map[low]
+            msg, mood, res = _run_buddy_action(registry, cfg, "sirius", act, params, log_mission=(low != "p"))
+            sirius_reply = msg
+            sirius_mood = mood
+            headline = (res.meta or {}).get("headline", "Buddy Deck") if res else "Buddy Deck"
 
 
 def _run_soul_screen(
@@ -133,7 +444,7 @@ def _run_log_screen(display: Display, live: Live) -> str:
 
 
 def _run_config_screen(display: Display, live: Live) -> dict:
-    """Interactive settings editor; returns updated config dict (or signals quit via None)."""
+    """Interactive settings editor; returns updated config dict (with `_quit` if quitting)."""
     cfg = load_config()
     selected = 0
     editing = False
@@ -197,7 +508,7 @@ def _run_config_screen(display: Display, live: Live) -> dict:
             selected = (selected + 1) % len(CONFIG_ITEMS)
             status_msg = ""
         elif key in ("ENTER", "SPACE", "LEFT", "RIGHT"):
-            if cur_kind in ("bool", "cycle"):
+            if cur_kind == "bool":
                 cfg = toggle_or_cycle_config(cfg, cur_key)
                 status_msg = f"✓ {cur_label} = {cfg[cur_key]}"
             elif key == "ENTER":
@@ -209,23 +520,22 @@ def _run_config_screen(display: Display, live: Live) -> dict:
             status_msg = "✓ Defaults restored"
 
 
-def _summon_buddy_interactive(
+def _summon_pomo_interactive(
     live: Live,
     registry: BuddyRegistry,
     cfg: dict,
-    buddy_id: str,
-    action: str,
-    params: dict,
-) -> tuple[str, str, BuddyResult | None]:
-    """Execute a buddy action from the TUI and return (sirius_reply, mood, inline_result)."""
-    buddy = registry.get(buddy_id)
+    action: str = "open",
+    params: dict | None = None,
+) -> tuple[str, str]:
+    """Hand off interactive TTY cleanly to Pomo if installed, else guide user to Quick Timer."""
+    buddy = registry.get("pomo")
     if buddy is None:
-        return f"★ Buddy '{buddy_id}' isn't in the Castle yet.", "curious", None
+        return "✦ Pomo isn't registered in this Castle yet, dude.", "curious"
 
-    result = buddy.execute(action, params, cfg)
+    result = buddy.execute(action, params or {}, cfg)
     if not result.ok:
         record_mission_outcome(buddy.id, action, result.message, registry, xp_gain=0, ok=False)
-        return result.message, result.mood, None
+        return "✦ Pomo isn't installed here yet, dude—try Quick Timer [5] instead!", "wink"
 
     if result.interactive_cmd:
         ok, detail = _launch_interactive_cmd(live, result.interactive_cmd)
@@ -240,78 +550,85 @@ def _summon_buddy_interactive(
             machine_updates=result.meta.get("machine_updates"),
             ok=ok,
         )
-        soul = buddy.load_soul()
-        msg = soul.react("success", detail="Returned to the Castle!")
+        msg = "✦ Welcome back from the Clocktower, dude! Solid focus."
         if levelups:
             msg = f"{msg}\n{levelups[0]}"
-        return msg, "happy", None
+        return msg, "happy"
 
-    levelups = record_mission_outcome(
-        buddy_id=buddy.id,
-        action=action,
-        summary=result.message,
-        registry=registry,
-        xp_gain=int(result.meta.get("xp_gain", 3)),
-        memory_updates=result.meta.get("memory_updates"),
-        machine_updates=result.meta.get("machine_updates"),
-        ok=True,
-    )
-    msg = result.message
-    if levelups:
-        msg = f"{msg}\n{levelups[0]}"
-    return msg, result.mood, result
+    return result.message, result.mood
 
 
 def run_interactive(version: str) -> None:
-    """Launch the BMO-inspired Castle TUI Hub with Sirius and Pomo."""
+    """Launch the pure-keyboard Sirius & Castle retro TUI Hub."""
     display = Display()
     registry = BuddyRegistry()
     cfg = load_config()
-    brain, notice = create_brain(cfg)
 
     snapshots = registry.snapshot_all(cfg)
-    initial_plan = brain.plan("", registry, cfg)
-    sirius_reply = f"{notice}\n{initial_plan.reply}" if notice else initial_plan.reply
-    sirius_mood = initial_plan.mood
+    greet_res = registry.sirius.execute("greet", {}, cfg)
+    sirius_reply = greet_res.message
+    sirius_mood = greet_res.mood
+    host_label = socket.gethostname()
 
-    prompt = PromptBuffer()
-    focus_zone = "prompt"
     selected_idx = 0
-    inline_result: BuddyResult | None = None
     frame = 0
+    idle_ticks = 0
     last_size = console.size
-
     route = "home"
     soul_target = "sirius"
 
     try:
         with (
             keyboard_session(),
-            Live(console=console, refresh_per_second=16, screen=True) as live,
+            Live(console=console, refresh_per_second=12, screen=True) as live,
         ):
             flush_keys()
             while route != "quit":
+                if route in ("pulse", "repo", "ports", "sweep"):
+                    route = _run_helper_screen(display, live, registry, cfg, route)
+                    snapshots = registry.snapshot_all(cfg)
+                    idle_ticks = 0
+                    continue
+
+                if route == "timer":
+                    route = _run_timer_screen(display, live, registry, cfg)
+                    snapshots = registry.snapshot_all(cfg)
+                    idle_ticks = 0
+                    continue
+
+                if route == "moods":
+                    route = _run_moods_screen(display, live, cfg)
+                    idle_ticks = 0
+                    continue
+
+                if route == "toys":
+                    route = _run_toys_screen(display, live, registry, cfg)
+                    snapshots = registry.snapshot_all(cfg)
+                    idle_ticks = 0
+                    continue
+
                 if route == "buddies":
                     next_route, picked_id = _run_directory_screen(display, live, registry, cfg)
                     if next_route == "soul":
                         soul_target = picked_id
                         route = "soul"
                     elif next_route == "summon_pomo":
-                        sirius_reply, sirius_mood, inline_result = _summon_buddy_interactive(
-                            live, registry, cfg, "pomo", "open", {}
-                        )
+                        sirius_reply, sirius_mood = _summon_pomo_interactive(live, registry, cfg)
                         snapshots = registry.snapshot_all(cfg)
                         route = "home"
                     else:
                         route = next_route
+                    idle_ticks = 0
                     continue
 
                 if route == "soul":
                     route = _run_soul_screen(display, live, registry, soul_target)
+                    idle_ticks = 0
                     continue
 
                 if route == "log":
                     route = _run_log_screen(display, live)
+                    idle_ticks = 0
                     continue
 
                 if route == "config":
@@ -320,16 +637,18 @@ def run_interactive(version: str) -> None:
                         route = "quit"
                         break
                     cfg = updated
-                    brain, notice = create_brain(cfg)
                     snapshots = registry.snapshot_all(cfg)
-                    sirius_reply = notice or "★ Settings saved in the Master Study."
-                    sirius_mood = "happy"
+                    sirius_reply = "✦ Settings locked in, dude."
+                    sirius_mood = "smug"
                     route = "home"
+                    idle_ticks = 0
                     continue
 
                 # ── Home Hub screen ───────────────────────────────────
                 last_size = _sync_resize(last_size)
                 anim_frame = (frame // 2) if cfg.get("animations_enabled", True) else 0
+                show_shadow = bool(cfg.get("show_shadow", True))
+
                 live.update(
                     display.frame_center(
                         display.render_home_screen(
@@ -337,103 +656,98 @@ def run_interactive(version: str) -> None:
                             snapshots=snapshots,
                             sirius_reply=sirius_reply,
                             sirius_mood=sirius_mood,
-                            prompt_text=prompt.text,
-                            prompt_cursor=prompt.cursor,
-                            focus_zone=focus_zone,
                             selected_idx=selected_idx,
-                            inline_result=inline_result,
                             frame=anim_frame,
+                            show_shadow=show_shadow,
+                            host_label=host_label,
                         )
                     )
                 )
                 key = read_key(timeout=0.25)
                 frame += 1
                 if key is None:
+                    idle_ticks += 1
+                    if idle_ticks == 48:
+                        quip = registry.sirius.execute("idle", {}, cfg)
+                        sirius_reply = quip.message
+                        sirius_mood = "smug"
+                    elif idle_ticks == 140:
+                        sirius_mood = "sleepy"
+                        sirius_reply = "✦ Low-power hover mode, dude. Tap any key when you're ready."
                     continue
 
-                if key == "CTRL_C":
+                if idle_ticks >= 140:
+                    sirius_mood = "chill"
+                    sirius_reply = "✦ Oh—we're rollin' again? Cool, what's up dude?"
+                idle_ticks = 0
+
+                if key == "CTRL_C" or key == "ESC":
                     route = "quit"
                     break
 
-                if key == "TAB":
-                    focus_zone = "menu" if focus_zone == "prompt" else "prompt"
+                low = key.lower()
+                if low == "q":
+                    route = "quit"
+                    break
+                if key == "UP" or low == "k":
+                    selected_idx = (selected_idx - 1) % len(HOME_MENU)
+                    continue
+                if key == "DOWN" or low == "j":
+                    selected_idx = (selected_idx + 1) % len(HOME_MENU)
                     continue
 
-                if focus_zone == "menu":
-                    low = key.lower()
-                    if key == "ESC" or low == "q":
-                        route = "quit"
-                        break
-                    if key == "UP" or low == "k":
-                        selected_idx = (selected_idx - 1) % len(HOME_MENU)
-                    elif key == "DOWN" or low == "j":
-                        selected_idx = (selected_idx + 1) % len(HOME_MENU)
-                    elif key in ("/", "i"):
-                        focus_zone = "prompt"
-                    else:
-                        chosen = None
-                        if key in ("ENTER", "SPACE"):
-                            chosen = HOME_MENU[selected_idx][0]
-                        else:
-                            for action_id, hotkey, _, _ in HOME_MENU:
-                                if low == hotkey:
-                                    chosen = action_id
-                                    break
-                        if chosen == "quit":
-                            route = "quit"
-                            break
-                        if chosen == "pomo":
-                            sirius_reply, sirius_mood, inline_result = _summon_buddy_interactive(
-                                live, registry, cfg, "pomo", "open", {}
-                            )
-                            snapshots = registry.snapshot_all(cfg)
-                        elif chosen in ("buddies", "log", "config"):
-                            route = chosen
-                    continue
-
-                # ── Prompt focus mode ─────────────────────────────────
-                if key == "ESC":
-                    if prompt.text:
-                        prompt.text = ""
-                        prompt.cursor = 0
-                    else:
-                        focus_zone = "menu"
-                    continue
-
-                submitted = prompt.handle_key(key)
-                if submitted is None:
-                    continue
-
-                plan = brain.plan(submitted, registry, cfg)
-                if plan.target == "sirius":
-                    if plan.action == "quit":
-                        route = "quit"
-                        break
-                    if plan.action in ("buddies", "log", "config"):
-                        route = plan.action
-                        sirius_reply = plan.reply
-                        sirius_mood = plan.mood
-                        continue
-                    if plan.action == "soul":
-                        soul_target = plan.params.get("buddy", "sirius")
-                        route = "soul"
-                        continue
-                    inline_result = None
-                    sirius_reply = plan.reply
-                    sirius_mood = plan.mood
-                    if plan.action not in ("unknown", "clear"):
-                        record_mission_outcome("sirius", plan.action, submitted or plan.action, registry, xp_gain=2)
-                        snapshots = registry.snapshot_all(cfg)
+                chosen = None
+                if key in ("ENTER", "SPACE"):
+                    chosen = HOME_MENU[selected_idx][0]
                 else:
-                    sirius_reply, sirius_mood, inline_result = _summon_buddy_interactive(
-                        live, registry, cfg, plan.target, plan.action, plan.params
+                    for action_id, hotkey, _, _ in HOME_MENU:
+                        if low == hotkey:
+                            chosen = action_id
+                            break
+
+                if chosen == "pomo":
+                    sirius_reply, sirius_mood = _summon_pomo_interactive(live, registry, cfg)
+                    snapshots = registry.snapshot_all(cfg)
+                    continue
+                if chosen in ("pulse", "repo", "ports", "sweep", "timer"):
+                    route = chosen
+                    continue
+
+                if low == "p":
+                    sirius_reply, sirius_mood, _ = _run_buddy_action(
+                        registry, cfg, "sirius", "poke", log_mission=False
                     )
                     snapshots = registry.snapshot_all(cfg)
+                elif low == "f":
+                    sirius_reply, sirius_mood, _ = _run_buddy_action(
+                        registry, cfg, "sirius", "snack", log_mission=True
+                    )
+                    snapshots = registry.snapshot_all(cfg)
+                elif low == "o":
+                    route = "toys"
+                elif low == "m":
+                    route = "moods"
+                elif low == "d":
+                    route = "buddies"
+                elif low == "l":
+                    route = "log"
+                elif low == "s":
+                    route = "config"
+                elif low == "r":
+                    greet_res = registry.sirius.execute("greet", {}, cfg)
+                    sirius_reply = greet_res.message
+                    sirius_mood = greet_res.mood
 
     except KeyboardInterrupt:
         pass
 
     sirius_soul = registry.sirius.load_soul()
     sirius_core, _ = registry.sirius.load_core()
-    farewell = sirius_soul.react("farewell", user=cfg.get("user_name", "friend"))
-    console.print(display.render_goodbye_screen(farewell, sirius_core))
+    farewell = sirius_soul.react("farewell", user=cfg.get("user_name", "dude"))
+    console.print(
+        display.render_goodbye_screen(
+            farewell,
+            sirius_core,
+            show_shadow=bool(cfg.get("show_shadow", True)),
+        )
+    )

@@ -1,15 +1,17 @@
 """CLI entry point for `sirius` and `castle`."""
 
 import argparse
+import os
 import subprocess
 import sys
 
 from castle import __version__
-from castle.brain import create_brain, record_mission_outcome
+from castle.buddies.missions import record_mission_outcome
 from castle.buddies.registry import BuddyRegistry
 from castle.storage.config import load_config, set_config, show_config
 from castle.storage.journal import get_recent_events
 from castle.ui.display import Display
+from castle.ui.sirius_art import SIRIUS_MOODS, get_mood_spec
 
 
 def _ensure_utf8() -> None:
@@ -29,24 +31,27 @@ def _execute_cli_buddy(
     registry: BuddyRegistry,
     cfg: dict,
     display: Display,
-    sirius_reply: str | None = None,
-    notice: str | None = None,
 ) -> int:
     """Execute a buddy action from one-shot CLI mode and record evolution/journal."""
     buddy = registry.get(buddy_id)
     if buddy is None:
-        display.print_result_cli(f"★ Buddy '{buddy_id}' isn't registered in the Castle yet.")
+        display.print_sirius_cli(f"✦ Buddy '{buddy_id}' isn't in the Castle yet, dude.", mood="curious")
         return 1
 
+    show_shadow = bool(cfg.get("show_shadow", True))
     result = buddy.execute(action, params, cfg)
     if not result.ok:
         record_mission_outcome(buddy.id, action, result.message, registry, xp_gain=0, ok=False)
-        display.print_result_cli(sirius_reply or result.message, result=result, notice=notice)
+        display.print_sirius_cli(
+            result.message,
+            mood=result.mood,
+            result=result,
+            show_shadow=show_shadow,
+        )
         return 1
 
     if result.interactive_cmd:
-        if sirius_reply:
-            display.print_result_cli(sirius_reply, notice=notice)
+        display.print_sirius_cli(result.message, mood=result.mood, show_shadow=show_shadow)
         try:
             proc = subprocess.run(result.interactive_cmd)
             ok = proc.returncode == 0
@@ -67,7 +72,7 @@ def _execute_cli_buddy(
             ok=ok,
         )
         for msg in levelups:
-            display.print_result_cli(msg)
+            display.print_sirius_cli(msg, mood="hyped", show_shadow=show_shadow)
         return code
 
     levelups = record_mission_outcome(
@@ -80,11 +85,12 @@ def _execute_cli_buddy(
         machine_updates=result.meta.get("machine_updates"),
         ok=True,
     )
-    display.print_result_cli(
-        sirius_reply or result.message,
+    display.print_sirius_cli(
+        result.message,
+        mood=result.mood,
         result=result,
         levelups=levelups,
-        notice=notice,
+        show_shadow=show_shadow,
     )
     return 0
 
@@ -99,11 +105,17 @@ def _handle_summon_args(
     """Route `sirius summon <buddy> [args...]` or `sirius pomo [args...]` cleanly."""
     buddy = registry.get(buddy_name)
     if buddy is None:
-        display.print_result_cli(f"★ No resident named '{buddy_name}' in the Castle.")
+        display.print_sirius_cli(f"✦ No resident named '{buddy_name}' in the Castle, dude.", mood="curious")
         return 1
     if buddy.id == "sirius":
         snapshots = registry.snapshot_all(cfg)
-        display.print_status_cli(snapshots, buddy.execute("greet", {}, cfg).message)
+        greet = buddy.execute("greet", {}, cfg)
+        display.print_status_cli(
+            snapshots,
+            greet.message,
+            mood=greet.mood,
+            show_shadow=bool(cfg.get("show_shadow", True)),
+        )
         return 0
 
     cleaned = [a for a in raw_args if a != "--"]
@@ -120,32 +132,93 @@ def _handle_summon_args(
     return _execute_cli_buddy(buddy.id, "open", {"raw_args": cleaned}, registry, cfg, display)
 
 
+def _handle_sweep_cli(args, registry: BuddyRegistry, cfg: dict, display: Display) -> int:
+    show_shadow = bool(cfg.get("show_shadow", True))
+    if not args.clean:
+        return _execute_cli_buddy("sirius", "sweep", {"path": args.path}, registry, cfg, display)
+
+    # Preview first before cleaning
+    preview = registry.sirius.execute("sweep", {"path": args.path}, cfg)
+    report = (preview.meta or {}).get("report")
+    if report is None or report.safe_count == 0:
+        display.print_sirius_cli(preview.message, mood=preview.mood, result=preview, show_shadow=show_shadow)
+        return 0
+
+    if not args.yes:
+        display.print_sirius_cli(preview.message, mood=preview.mood, result=preview, show_shadow=show_shadow)
+        if not sys.stdin.isatty():
+            display.print_sirius_cli(
+                "✦ Pass `--yes` to clean non-interactively, dude.",
+                mood="unimpressed",
+                show_shadow=show_shadow,
+            )
+            return 1
+        try:
+            answer = input("Sweep safe caches now? [y/N]: ").strip().lower()
+        except (EOFError, KeyboardInterrupt):
+            return 1
+        if answer not in ("y", "yes"):
+            display.print_sirius_cli("✦ Chill—left everything alone, dude.", mood="chill", show_shadow=show_shadow)
+            return 0
+
+    return _execute_cli_buddy("sirius", "sweep", {"path": args.path, "clean": True}, registry, cfg, display)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="sirius",
-        description="★ Sirius & the Castle — Retro CLI Cyber-Buddy Hub",
+        description="✦ Sirius & the Castle — Offline Retro CLI Cyber-Buddy & Device Helper",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "examples:\n"
-            "  sirius                              Open interactive BMO Castle TUI\n"
-            "  sirius ask start deep focus on api  Ask Sirius in natural language\n"
-            "  sirius status                       Castle & today's focus summary\n"
-            "  sirius buddies                      List residents, rooms & cores\n"
-            "  sirius pomo start -p sprint -t dev  Summon Pomo directly\n"
-            "  sirius soul sirius                  Inspect Sirius's soul.md & core\n"
-            "  sirius log                          Show recent Castle missions\n"
-            "  sirius config                       View or set Castle settings\n"
+            "  sirius                    Open interactive keyboard TUI Hub\n"
+            "  sirius pulse              Check OS, CPU, RAM, disk & battery\n"
+            "  sirius repo               Scout Git branch, dirty files & stack\n"
+            "  sirius ports              Inspect listening localhost & dev ports\n"
+            "  sirius sweep              Scan workspace for safe cache clutter\n"
+            "  sirius timer 25           Start a 25m offline countdown timer\n"
+            "  sirius poke               Poke Sirius for a sharp reaction\n"
+            "  sirius mood smug          Preview Sirius expressions in CLI\n"
+            "  sirius pomo status        Check Pomo Clocktower stats\n"
         ),
     )
     parser.add_argument("-v", "--version", action="version", version=f"Castle {__version__}")
 
     sub = parser.add_subparsers(dest="command")
 
-    sp_ask = sub.add_parser("ask", help="Ask Sirius to route a natural-language request")
-    sp_ask.add_argument("words", nargs="+", help="Message or task for Sirius")
+    sub.add_parser("pulse", aliases=["vitals"], help="Inspect OS, CPU, RAM, disk, battery & local IP")
+    sub.add_parser("status", help="Show Sirius and Castle buddies summary")
 
-    sub.add_parser("status", help="Show Castle and resident summary")
-    sub.add_parser("buddies", help="List Castle residents, rooms, souls, and cores")
+    sp_repo = sub.add_parser("repo", aliases=["git"], help="Scout Git repo & project stack")
+    sp_repo.add_argument("path", nargs="?", default=None, help="Directory to inspect (default: cwd)")
+
+    sp_ports = sub.add_parser("ports", help="Inspect listening TCP ports and dev servers")
+    sp_ports.add_argument("ports", nargs="*", type=int, help="Optional specific ports to check")
+
+    sp_sweep = sub.add_parser("sweep", help="Scan workspace for safe dev cache clutter")
+    sp_sweep.add_argument("path", nargs="?", default=None, help="Directory to scan (default: cwd)")
+    sp_sweep.add_argument("--clean", action="store_true", help="Sweep safe caches (__pycache__, .pytest_cache, etc.)")
+    sp_sweep.add_argument("-y", "--yes", action="store_true", help="Skip confirmation prompt with --clean")
+
+    sp_timer = sub.add_parser("timer", help="Start built-in offline keyboard countdown timer")
+    sp_timer.add_argument("minutes", nargs="?", type=int, default=25, help="Countdown duration in minutes (default: 25)")
+
+    sub.add_parser("poke", help="Poke Sirius and watch how he reacts")
+
+    sp_snack = sub.add_parser("snack", help="Toss Sirius a cosmic snack")
+    sp_snack.add_argument("item", nargs="?", default=None, help="Snack id: espresso, photon, pretzel, pizza, tea")
+
+    sub.add_parser("flip", help="Flip a cosmic coin offline")
+
+    sp_roll = sub.add_parser("roll", help="Roll an N-sided die offline (default: d20)")
+    sp_roll.add_argument("sides", nargs="?", type=int, default=20, help="Number of sides (default: 20)")
+
+    sub.add_parser("oracle", help="Get a sharp offline cosmic decision")
+
+    sp_mood = sub.add_parser("mood", help="Preview Sirius expressions in the CLI")
+    sp_mood.add_argument("name", nargs="?", default=None, help="Mood id (omit to list all expressions)")
+
+    sub.add_parser("buddies", help="List Castle buddies, rooms, souls & cores")
 
     sp_summon = sub.add_parser("summon", help="Directly summon a Castle buddy")
     sp_summon.add_argument("buddy", help="Buddy name, id, or room (e.g. pomo)")
@@ -175,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     cfg = load_config()
     registry = BuddyRegistry()
     display = Display()
+    show_shadow = bool(cfg.get("show_shadow", True))
 
     if args.command is None:
         if sys.stdin.isatty() and sys.stdout.isatty():
@@ -183,16 +257,81 @@ def main(argv: list[str] | None = None) -> int:
             run_interactive(__version__)
         else:
             snapshots = registry.snapshot_all(cfg)
-            brain, _ = create_brain(cfg)
-            greeting = brain.plan("", registry, cfg).reply
-            display.print_status_cli(snapshots, greeting)
+            greet = registry.sirius.execute("greet", {}, cfg)
+            display.print_status_cli(snapshots, greet.message, mood=greet.mood, show_shadow=show_shadow)
+            if sys.platform == "win32" and os.environ.get("MSYSTEM") and not os.environ.get("WT_SESSION"):
+                display.print_sirius_cli(
+                    "✦ Running under Mintty pipe? Open Git Bash inside Windows Terminal (or `winpty sirius`) for the full interactive TUI, dude!",
+                    mood="wink",
+                    show_shadow=show_shadow,
+                )
         return 0
 
     if args.command == "status":
         snapshots = registry.snapshot_all(cfg)
-        brain, _ = create_brain(cfg)
-        greeting = brain.plan("", registry, cfg).reply
-        display.print_status_cli(snapshots, greeting)
+        greet = registry.sirius.execute("greet", {}, cfg)
+        display.print_status_cli(snapshots, greet.message, mood=greet.mood, show_shadow=show_shadow)
+        return 0
+
+    if args.command in ("pulse", "vitals"):
+        return _execute_cli_buddy("sirius", "pulse", {}, registry, cfg, display)
+
+    if args.command in ("repo", "git"):
+        return _execute_cli_buddy("sirius", "repo", {"path": args.path}, registry, cfg, display)
+
+    if args.command == "ports":
+        return _execute_cli_buddy("sirius", "ports", {"ports": args.ports or None}, registry, cfg, display)
+
+    if args.command == "sweep":
+        return _handle_sweep_cli(args, registry, cfg, display)
+
+    if args.command == "timer":
+        if not (sys.stdin.isatty() and sys.stdout.isatty()):
+            display.print_sirius_cli(
+                f"✦ Timer needs an interactive terminal, dude (requested {args.minutes}m).",
+                mood="curious",
+                show_shadow=show_shadow,
+            )
+            return 1
+        from rich.live import Live
+        from castle.ui.app import _run_timer_screen
+        from castle.ui.display import console
+        from castle.ui.keys import keyboard_session
+
+        with keyboard_session(), Live(console=console, refresh_per_second=12, screen=True) as live:
+            _run_timer_screen(display, live, registry, cfg, initial_minutes=args.minutes, auto_start=True)
+        return 0
+
+    if args.command == "poke":
+        return _execute_cli_buddy("sirius", "poke", {}, registry, cfg, display)
+
+    if args.command == "snack":
+        return _execute_cli_buddy("sirius", "snack", {"item": args.item}, registry, cfg, display)
+
+    if args.command == "flip":
+        return _execute_cli_buddy("sirius", "flip", {}, registry, cfg, display)
+
+    if args.command == "roll":
+        return _execute_cli_buddy("sirius", "roll", {"sides": args.sides}, registry, cfg, display)
+
+    if args.command == "oracle":
+        return _execute_cli_buddy("sirius", "oracle", {}, registry, cfg, display)
+
+    if args.command == "mood":
+        if not args.name:
+            names = ", ".join(f"{m.id} ({m.label})" for m in SIRIUS_MOODS)
+            display.print_sirius_cli(
+                f"✦ Pick a mood with `sirius mood <name>`, dude:\n{names}",
+                mood="wink",
+                show_shadow=show_shadow,
+            )
+            return 0
+        spec = get_mood_spec(args.name)
+        display.print_sirius_cli(
+            f"✦ [{spec.label}] {spec.desc}.",
+            mood=spec.id,
+            show_shadow=show_shadow,
+        )
         return 0
 
     if args.command == "buddies":
@@ -209,7 +348,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "soul":
         buddy = registry.get(args.buddy)
         if buddy is None:
-            display.print_result_cli(f"★ No buddy named '{args.buddy}' in the Castle.")
+            display.print_sirius_cli(f"✦ No buddy named '{args.buddy}' in the Castle, dude.", mood="curious", show_shadow=show_shadow)
             return 1
         soul = buddy.load_soul()
         core, _ = buddy.load_core()
@@ -227,50 +366,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "summon":
         return _handle_summon_args(args.buddy, args.extra, registry, cfg, display)
-
-    if args.command == "ask":
-        query = " ".join(args.words).strip()
-        brain, notice = create_brain(cfg)
-        plan = brain.plan(query, registry, cfg)
-        if plan.target == "sirius":
-            if plan.action == "buddies":
-                display.print_buddies_cli(registry.snapshot_all(cfg))
-                record_mission_outcome("sirius", "buddies", query, registry, xp_gain=2)
-                return 0
-            if plan.action == "log":
-                display.print_log_cli(get_recent_events(limit=15))
-                record_mission_outcome("sirius", "log", query, registry, xp_gain=2)
-                return 0
-            if plan.action == "soul":
-                target = registry.get(plan.params.get("buddy", "sirius")) or registry.sirius
-                core, _ = target.load_core()
-                display.print_soul_cli(target.load_soul(), core)
-                record_mission_outcome("sirius", "soul", query, registry, xp_gain=2)
-                return 0
-            if plan.action == "config":
-                show_config()
-                return 0
-            if plan.action == "status":
-                display.print_status_cli(registry.snapshot_all(cfg), plan.reply)
-                record_mission_outcome("sirius", "status", query, registry, xp_gain=2)
-                return 0
-
-            levelups: list[str] = []
-            if plan.action != "unknown":
-                levelups = record_mission_outcome("sirius", plan.action, query, registry, xp_gain=2)
-            display.print_result_cli(plan.reply, levelups=levelups, notice=notice)
-            return 0 if plan.action != "unknown" else 1
-
-        return _execute_cli_buddy(
-            plan.target,
-            plan.action,
-            plan.params,
-            registry,
-            cfg,
-            display,
-            sirius_reply=plan.reply,
-            notice=notice,
-        )
 
     return 0
 

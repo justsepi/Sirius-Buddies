@@ -101,7 +101,10 @@ def load_or_evolve_core(
             ranks=ranks,
         )
         _append_evolution(core, f"Core v{target_version} awakened in {room}.")
-        write_json(path, core)
+        try:
+            write_json(path, core)
+        except OSError:
+            pass
         return core, True
 
     core = _ensure_structure(raw, buddy_id=buddy_id, ranks=ranks)
@@ -121,7 +124,10 @@ def load_or_evolve_core(
         evolved = True
 
     if evolved or not path.exists():
-        write_json(path, core)
+        try:
+            write_json(path, core)
+        except OSError:
+            pass
     return core, evolved
 
 
@@ -163,5 +169,8 @@ def record_mission(
     if leveled_up:
         _append_evolution(core, f"Evolved to Lv.{new_level} ({new_rank})!")
 
-    write_json(get_core_path(buddy_id), core)
+    try:
+        write_json(get_core_path(buddy_id), core)
+    except OSError:
+        pass
     return core, leveled_up
