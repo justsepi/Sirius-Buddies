@@ -31,7 +31,10 @@ def log_event(
     entries.append(entry)
     if len(entries) > MAX_JOURNAL_ENTRIES:
         entries = entries[-MAX_JOURNAL_ENTRIES:]
-    write_json(get_journal_file(), entries)
+    try:
+        write_json(get_journal_file(), entries)
+    except OSError:
+        pass
     return entry
 
 

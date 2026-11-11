@@ -6,15 +6,11 @@ from rich.console import Console
 from castle.storage import get_data_dir, read_json, write_json
 
 DEFAULTS = {
-    "user_name": "friend",
-    "brain_provider": "deterministic",
-    "ollama_model": "llama3.2",
-    "ollama_url": "http://localhost:11434",
+    "user_name": "dude",
     "animations_enabled": True,
+    "show_shadow": True,
     "pomo_command": "",
 }
-
-VALID_BRAIN_PROVIDERS = ("deterministic", "ollama")
 
 
 def get_config_file() -> Path:
@@ -23,14 +19,16 @@ def get_config_file() -> Path:
 
 
 def load_config() -> dict:
-    """Load config merged over DEFAULTS."""
+    """Load active Castle settings merged over DEFAULTS."""
     raw = read_json(get_config_file(), {})
-    return {**DEFAULTS, **raw}
+    cleaned = {k: v for k, v in raw.items() if k in DEFAULTS}
+    return {**DEFAULTS, **cleaned}
 
 
 def save_config(cfg: dict) -> None:
-    """Persist config dictionary to disk."""
-    write_json(get_config_file(), cfg)
+    """Persist active Castle config keys to disk."""
+    filtered = {k: cfg.get(k, default) for k, default in DEFAULTS.items()}
+    write_json(get_config_file(), filtered)
 
 
 def parse_config_value(key: str, value: str) -> tuple[bool, object, str]:
@@ -48,9 +46,6 @@ def parse_config_value(key: str, value: str) -> tuple[bool, object, str]:
         return False, None, f"Expected boolean (true/false) for {key}"
 
     cleaned = value.strip()
-    if key == "brain_provider" and cleaned not in VALID_BRAIN_PROVIDERS:
-        opts = ", ".join(VALID_BRAIN_PROVIDERS)
-        return False, None, f"brain_provider must be one of: {opts}"
     if key == "user_name" and not cleaned:
         return False, None, "user_name cannot be empty"
     return True, cleaned, ""
@@ -69,7 +64,7 @@ def set_config(key: str, value: str, console: Console | None = None) -> bool:
     cfg = load_config()
     cfg[key] = parsed
     save_config(cfg)
-    out.print(f"  [bright_green]✓[/] {key} = {parsed}")
+    out.print(f"  [bright_blue]✓[/] {key} = {parsed}")
     return True
 
 
@@ -77,7 +72,7 @@ def show_config(key: str | None = None, console: Console | None = None) -> None:
     """Print current Castle settings."""
     out = console or Console()
     cfg = load_config()
-    out.print("\n  [bright_cyan]★  Castle Config[/]\n")
+    out.print("\n  [bold bright_white]✦  Castle Config[/]\n")
     if key:
         if key in cfg:
             out.print(f"  {key} = {cfg[key]}")
@@ -91,14 +86,10 @@ def show_config(key: str | None = None, console: Console | None = None) -> None:
 
 
 def toggle_or_cycle_config(cfg: dict, key: str) -> dict:
-    """Toggle booleans or cycle enum settings from the interactive Config screen."""
+    """Toggle boolean settings from the interactive Config screen."""
     updated = dict(cfg)
     if isinstance(DEFAULTS.get(key), bool):
         updated[key] = not bool(updated.get(key, DEFAULTS[key]))
-    elif key == "brain_provider":
-        cur = updated.get(key, "deterministic")
-        idx = VALID_BRAIN_PROVIDERS.index(cur) if cur in VALID_BRAIN_PROVIDERS else 0
-        updated[key] = VALID_BRAIN_PROVIDERS[(idx + 1) % len(VALID_BRAIN_PROVIDERS)]
     save_config(updated)
     return updated
 

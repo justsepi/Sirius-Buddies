@@ -13,13 +13,15 @@ else:
     import termios
 
 _WIN_EXTENDED_MAP = {
-    b"H": "UP",
-    b"P": "DOWN",
-    b"K": "LEFT",
-    b"M": "RIGHT",
-    b"G": "HOME",
-    b"O": "END",
-    b"S": "DELETE",
+    "H": "UP",
+    "P": "DOWN",
+    "K": "LEFT",
+    "M": "RIGHT",
+    "G": "HOME",
+    "O": "END",
+    "S": "DELETE",
+    "I": "PGUP",
+    "Q": "PGDN",
 }
 
 _ANSI_ARROWS = {
@@ -29,6 +31,7 @@ _ANSI_ARROWS = {
     b"D": "LEFT",
     b"H": "HOME",
     b"F": "END",
+    b"Z": "BACKTAB",
 }
 
 _posix_depth = 0
@@ -94,27 +97,78 @@ def pause_keyboard_session():
             pass
 
 
-def _decode_win_byte(raw: bytes) -> str | None:
-    """Decode a Windows msvcrt byte (and extended second byte if needed)."""
-    if raw in (b"\x00", b"\xe0"):
-        code = msvcrt.getch()
-        return _WIN_EXTENDED_MAP.get(code)
-    if raw == b"\x03":
-        return "CTRL_C"
-    if raw in (b"\r", b"\n"):
-        return "ENTER"
-    if raw == b"\x1b":
+def _decode_ansi_escape(read_byte_fn, has_data_fn) -> str | None:
+    """Decode an ESC-prefixed ANSI/VT escape tail into a normalized key token."""
+    if not has_data_fn(0.03):
         return "ESC"
-    if raw in (b"\x08", b"\x7f"):
-        return "BACKSPACE"
-    if raw == b" ":
-        return "SPACE"
-    if raw == b"\t":
-        return "TAB"
-    try:
-        return raw.decode("utf-8")
-    except (UnicodeDecodeError, ValueError):
+    b2 = read_byte_fn()
+    if b2 == b"[":
+        if not has_data_fn(0.02):
+            return "ESC"
+        seq = bytearray()
+        for _ in range(16):
+            ch = read_byte_fn()
+            if not ch:
+                break
+            seq.extend(ch)
+            if 0x40 <= ch[0] <= 0x7E:
+                break
+            if not has_data_fn(0.02):
+                break
+        if seq == b"3~":
+            return "DELETE"
+        if seq in (b"1~", b"7~"):
+            return "HOME"
+        if seq in (b"4~", b"8~"):
+            return "END"
+        if seq == b"5~":
+            return "PGUP"
+        if seq == b"6~":
+            return "PGDN"
+        return _ANSI_ARROWS.get(bytes([seq[-1]])) if seq else None
+    if b2 == b"O":
+        if has_data_fn(0.02):
+            return _ANSI_ARROWS.get(read_byte_fn())
+        return "ESC"
+    return "ESC"
+
+
+def _decode_win_sequence(read_char_fn, has_data_fn) -> str | None:
+    """Decode a Windows msvcrt character stream (scan codes + VT sequences)."""
+    ch = read_char_fn()
+    if not ch:
         return None
+    if ch in ("\x00", "\xe0"):
+        return _WIN_EXTENDED_MAP.get(read_char_fn())
+    if ch == "\x03":
+        return "CTRL_C"
+    if ch in ("\r", "\n"):
+        return "ENTER"
+    if ch in ("\x08", "\x7f"):
+        return "BACKSPACE"
+    if ch == " ":
+        return "SPACE"
+    if ch == "\t":
+        return "TAB"
+    if ch == "\x1b":
+        return _decode_ansi_escape(
+            lambda: read_char_fn().encode("latin-1", errors="ignore")[:1],
+            has_data_fn,
+        )
+    return ch
+
+
+def _win_has_data(timeout: float = 0.0) -> bool:
+    if msvcrt.kbhit():
+        return True
+    if timeout <= 0:
+        return False
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if msvcrt.kbhit():
+            return True
+        time.sleep(0.005)
+    return False
 
 
 def _posix_has_data(fd: int, timeout: float = 0.0) -> bool:
@@ -138,32 +192,7 @@ def _decode_posix_sequence(read_byte_fn, has_data_fn) -> str | None:
     if raw == b"\t":
         return "TAB"
     if raw == b"\x1b":
-        if not has_data_fn(0.03):
-            return "ESC"
-        b2 = read_byte_fn()
-        if b2 == b"[":
-            if not has_data_fn(0.02):
-                return "ESC"
-            seq = bytearray()
-            for _ in range(16):
-                ch = read_byte_fn()
-                seq.extend(ch)
-                if 0x40 <= ch[0] <= 0x7E:
-                    break
-                if not has_data_fn(0.02):
-                    break
-            if seq == b"3~":
-                return "DELETE"
-            if seq in (b"1~", b"7~"):
-                return "HOME"
-            if seq in (b"4~", b"8~"):
-                return "END"
-            return _ANSI_ARROWS.get(bytes([seq[-1]])) if seq else None
-        if b2 == b"O":
-            if has_data_fn(0.02):
-                return _ANSI_ARROWS.get(read_byte_fn())
-            return "ESC"
-        return "ESC"
+        return _decode_ansi_escape(read_byte_fn, has_data_fn)
 
     lead = raw[0]
     if lead >= 0x80:
@@ -196,7 +225,7 @@ def flush_keys(limit: int = 128) -> None:
         for _ in range(limit):
             if not msvcrt.kbhit():
                 break
-            msvcrt.getch()
+            msvcrt.getwch()
     elif sys.stdin.isatty():
         fd = sys.stdin.fileno()
         for _ in range(limit):
@@ -210,7 +239,7 @@ def read_key_nonblocking() -> str | None:
     if sys.platform == "win32":
         if not msvcrt.kbhit():
             return None
-        return _decode_win_byte(msvcrt.getch())
+        return _decode_win_sequence(msvcrt.getwch, _win_has_data)
 
     if not sys.stdin.isatty():
         return None

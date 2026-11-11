@@ -1,59 +1,76 @@
-# Sirius & the Castle ★
+# Sirius & the Castle ✦
 
-**Cross-platform retro CLI cyber-buddy ecosystem for Windows, macOS, and Arch Linux.**
+**Cross-platform retro CLI cyber-buddy & offline device-helper hub for macOS (`zsh`), Windows (`Git Bash` / `PowerShell` in Windows Terminal), and Linux.**
 
-Inspired by BMO, the Castle houses a growing family of warm, single-task terminal buddies led by **Sirius** (the Master Study brain) and **Pomo** (the Clocktower focus & time tracker from `pomoclk`).
+**Sirius** is a floating bright-white and blue retro star buddy with a visible floating shadow, 12 expressive CLI moods, and practical pure-offline device utilities—driven completely from your keyboard with zero cloud or AI dependencies. Alongside Sirius, the Castle can also summon specialist buddies like **Pomo** (`pomoclk`) when installed.
 
-Each buddy carries:
-- **`soul.md`** — an editable Markdown personality file driving replies today and ready to serve as a local LLM system prompt later.
-- **`core.json`** — a versioned, evolving core that upgrades cleanly across releases and grows XP, ranks, and machine-scoped observations as you work together.
+## Install (Beta)
 
-## Install
-
-Clone from GitHub on any machine:
+Clone the `beta` branch from GitHub:
 ```sh
-git clone https://github.com/justsepi/Sirius-Buddies.git
+git clone -b beta https://github.com/justsepi/Sirius-Buddies.git
 cd Sirius-Buddies
 ```
 
-### Windows (PowerShell)
+### macOS (`zsh` / `bash`) & Linux
+```sh
+sh install.sh
+source ~/.zshrc   # needed once in an already-open tab; new tabs work automatically
+```
+
+### Windows Terminal — Git Bash (`bash`)
+Open a **Git Bash** tab inside **Windows Terminal** and run:
+```sh
+sh install.sh
+source ~/.bashrc
+```
+*(We recommend running Git Bash inside Windows Terminal rather than standalone Mintty so interactive keyboard control runs directly over ConPTY.)*
+
+### Windows — PowerShell (Editable Dev Install)
 ```powershell
 pip install -e .
 ```
 *(Run `sirius` or `castle`, or `python -m castle.cli` if `Scripts` is not on your `PATH`.)*
 
-### macOS & Arch Linux (`zsh` / `bash`)
-```sh
-sh install.sh
-source ~/.zshrc   # needed once in an already-open tab; new tabs work automatically
-```
-Or install manually with `pipx`:
-```sh
-pipx install .
-pipx ensurepath
-```
+## Keyboard TUI & CLI Commands
 
-## Usage
+Run `sirius` (or `castle`) with no arguments to open the interactive keyboard-driven Hub:
+- `↑` / `↓` (or `j` / `k`) + `Enter` — navigate and launch Device Helpers
+- `1`–`6` — quick-launch **System Pulse**, **Repo & Git Scout**, **Port Inspector**, **Cache Sweep**, **Quick Timer**, or **Summon Pomo**
+- `p` **Poke Sirius** · `f` **Toss Snack** · `o` **Cosmic Flip / Roll / Oracle** · `m` **Moods Gallery**
+- `d` **Castle Buddies** · `l` **Mission Log** · `s` **Settings** · `q` / `Esc` **Quit**
 
-Run `sirius` (or `castle`) with no arguments to open the interactive BMO-style Castle Hub, or run direct commands:
+Or call any offline helper directly from your terminal:
 
 | Command | What it does |
-|---------|-------------|
-| `sirius` | Interactive BMO-style Castle TUI Hub |
-| `sirius ask "start deep focus on api"` | Ask Sirius in natural phrasing to route/execute a task |
-| `sirius status` | Castle & today's focus summary |
-| `sirius buddies` | List all residents, rooms, core levels, and `soul.md` paths |
-| `sirius summon pomo` | Open Pomo directly (or `sirius pomo start -p sprint -t api`) |
-| `sirius log` | Recent Castle mission journal |
-| `sirius soul sirius` | Inspect (or get path to edit) a buddy's `soul.md` |
+|---------|--------------|
+| `sirius` | Open interactive keyboard TUI Hub |
+| `sirius pulse` | Inspect OS, CPU, RAM, disk, battery & local IP |
+| `sirius repo [path]` | Scout Git branch, dirty worktree, commits & stack |
+| `sirius ports [port...]` | Inspect listening localhost TCP ports & dev servers |
+| `sirius sweep [path]` | Scan safe dev caches (`__pycache__`, `.pytest_cache`, `.DS_Store`) |
+| `sirius sweep --clean` | Safely clear confirmed cache clutter (`-y` to skip prompt) |
+| `sirius timer [minutes]` | Built-in offline keyboard countdown timer (default 25m) |
+| `sirius poke` / `snack` | Cyber-buddy interactions with live expression changes |
+| `sirius flip` / `roll` / `oracle` | Offline coin flip, d20/dN dice roll & cosmic call |
+| `sirius mood [name]` | Preview Sirius's 12 CLI expressions |
+| `sirius pomo [args...]` | Summon Pomo (`pomoclk`) if installed |
+| `sirius buddies` | List Castle buddies, rooms & evolving cores |
+| `sirius soul [buddy]` | Inspect a buddy's `soul.md` & `core.json` |
+| `sirius log` | Recent Castle mission chronicle |
 | `sirius config [key] [value]` | View or update Castle settings |
 
-Standalone `pomo` (`pomoclk`) remains completely independent—running `pomo` directly still works identically and shares `~/.pomoclk/` stats with Sirius.
+## Offline Data & Customization
 
-## Data & Customization
-
-All Castle data lives offline in `~/.castle/` (override with `CASTLE_DIR`):
-- `config.json` — global settings (`user_name`, `brain_provider`, `animations_enabled`, `pomo_command`)
-- `journal.json` — mission chronicle
+All Castle data lives locally in `~/.castle/` (override with `CASTLE_DIR`):
+- `config.json` — settings (`user_name`, `animations_enabled`, `show_shadow`, `pomo_command`)
+- `journal.json` — bounded mission log
 - `buddies/<id>/soul.md` — editable buddy personality & reaction lines
 - `buddies/<id>/core.json` — evolving core (`core_version`, `xp`, `level`, `rank`, `memory`, `machine_facts`, `evolution_log`)
+
+## Running Tests
+
+```sh
+pip install -e ".[dev]"
+python -m pytest -v
+```

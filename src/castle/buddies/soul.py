@@ -3,6 +3,7 @@
 from dataclasses import dataclass, field
 from importlib import resources
 from pathlib import Path
+import random
 import re
 
 from castle.storage import get_data_dir
@@ -26,6 +27,7 @@ class SoulProfile:
     identity: str = ""
     traits: list[str] = field(default_factory=list)
     reactions: dict[str, str] = field(default_factory=dict)
+    reaction_variants: dict[str, list[str]] = field(default_factory=dict)
     source_path: Path | None = None
 
     @property
@@ -42,11 +44,11 @@ class SoulProfile:
 
     @property
     def signature(self) -> str:
-        return self.metadata.get("signature", "★")
+        return self.metadata.get("signature", "✦")
 
     @property
     def tone(self) -> str:
-        return self.metadata.get("tone", "warm, friendly")
+        return self.metadata.get("tone", "chill, sharp, friendly")
 
     @property
     def soul_version(self) -> int:
@@ -55,37 +57,30 @@ class SoulProfile:
         except ValueError:
             return 1
 
-    def react(self, event: str | list[str] | tuple[str, ...], fallback: str = "", **context) -> str:
-        """Render the first matching reaction template using safe placeholder substitution."""
+    def react(
+        self,
+        event: str | list[str] | tuple[str, ...],
+        fallback: str = "",
+        variant_index: int | None = None,
+        **context,
+    ) -> str:
+        """Render a matching reaction template using safe placeholder substitution."""
         keys = [event] if isinstance(event, str) else list(event)
         template = ""
         for key in keys:
+            variants = self.reaction_variants.get(key)
+            if variants:
+                if variant_index is not None:
+                    template = variants[variant_index % len(variants)]
+                else:
+                    template = random.choice(variants)
+                break
             if key in self.reactions:
                 template = self.reactions[key]
                 break
         if not template:
-            template = fallback or f"{self.signature} Ready whenever you are."
+            template = fallback or f"{self.signature} Right here, dude."
         return template.format_map(_SafeFormatDict(context))
-
-    def to_system_prompt(self, core_state: dict | None = None) -> str:
-        """Build a local-LLM-ready system prompt combining soul.md and core memory."""
-        parts = [f"Name: {self.name} ({self.role})"]
-        if self.tone:
-            parts.append(f"Tone: {self.tone}")
-        if self.identity:
-            parts.append(f"Identity:\n{self.identity}")
-        if self.traits:
-            traits_text = "\n".join(f"- {t}" for t in self.traits)
-            parts.append(f"Traits:\n{traits_text}")
-        if core_state:
-            lvl = core_state.get("level", 1)
-            rank = core_state.get("rank", "Spark")
-            missions = core_state.get("missions_completed", 0)
-            parts.append(f"Core State: Lv.{lvl} {rank}, {missions} missions completed.")
-            memory = core_state.get("memory") or {}
-            if memory:
-                parts.append(f"Memory: {memory}")
-        return "\n\n".join(parts)
 
 
 def _strip_quotes(value: str) -> str:
@@ -116,6 +111,7 @@ def parse_soul_markdown(text: str, buddy_id: str, source_path: Path | None = Non
     identity_lines: list[str] = []
     traits: list[str] = []
     reactions: dict[str, str] = {}
+    reaction_variants: dict[str, list[str]] = {}
 
     for raw in lines[idx:]:
         stripped = raw.strip()
@@ -133,7 +129,10 @@ def parse_soul_markdown(text: str, buddy_id: str, source_path: Path | None = Non
         elif section == "reactions":
             match = _REACTION_RE.match(stripped)
             if match:
-                reactions[match.group(1).strip().lower()] = _strip_quotes(match.group(2))
+                key = match.group(1).strip().lower()
+                val = _strip_quotes(match.group(2))
+                reactions.setdefault(key, val)
+                reaction_variants.setdefault(key, []).append(val)
 
     return SoulProfile(
         buddy_id=metadata.get("id", buddy_id),
@@ -141,6 +140,7 @@ def parse_soul_markdown(text: str, buddy_id: str, source_path: Path | None = Non
         identity="\n".join(identity_lines).strip(),
         traits=traits,
         reactions=reactions,
+        reaction_variants=reaction_variants,
         source_path=source_path,
     )
 
@@ -171,8 +171,11 @@ def load_soul(buddy_id: str) -> SoulProfile:
     if not local_path.exists():
         template = read_bundled_soul_text(buddy_id)
         if template:
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-            local_path.write_text(template, encoding="utf-8")
+            try:
+                local_path.parent.mkdir(parents=True, exist_ok=True)
+                local_path.write_text(template, encoding="utf-8")
+            except OSError:
+                pass
 
     if local_path.exists():
         try:

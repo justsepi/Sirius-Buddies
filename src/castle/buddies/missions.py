@@ -1,33 +1,7 @@
-"""Brain factory and shared intent execution pipeline."""
+"""Shared mission logging and buddy core evolution pipeline."""
 
-from dataclasses import dataclass, field
-
-from castle.brain.base import BrainProvider, IntentPlan
-from castle.brain.router import DeterministicBrain
-from castle.buddies.base import BuddyResult
 from castle.buddies.registry import BuddyRegistry
 from castle.storage.journal import log_event
-
-
-@dataclass
-class ExecutionOutcome:
-    """Complete outcome of planning and executing a user utterance."""
-
-    plan: IntentPlan
-    result: BuddyResult | None = None
-    levelups: list[str] = field(default_factory=list)
-
-
-def create_brain(config: dict) -> tuple[BrainProvider, str | None]:
-    """Create the configured BrainProvider, falling back safely to DeterministicBrain."""
-    provider = str(config.get("brain_provider", "deterministic")).strip().lower()
-    if provider == "deterministic":
-        return DeterministicBrain(), None
-    if provider == "ollama":
-        return DeterministicBrain(), (
-            "Local Ollama brain is planned for v0.2+; running offline deterministic router."
-        )
-    return DeterministicBrain(), f"Unknown brain_provider '{provider}'; using deterministic router."
 
 
 def record_mission_outcome(
@@ -60,7 +34,12 @@ def record_mission_outcome(
     sirius_xp = max(2, xp_gain // 2) if buddy_id != "sirius" else xp_gain
     sirius_core, sirius_leveled = registry.sirius.record_mission(
         xp_gain=sirius_xp,
-        memory_updates={"last_dispatched_buddy": buddy_id, "last_action": action},
+        memory_updates={
+            "last_dispatched_buddy": buddy_id,
+            "last_action": action,
+            **(memory_updates if buddy_id == "sirius" and memory_updates else {}),
+        },
+        machine_updates=machine_updates if buddy_id == "sirius" else None,
     )
     if sirius_leveled:
         sirius_soul = registry.sirius.load_soul()
