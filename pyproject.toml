@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "castle"
-version = "0.1.1"
+version = "1.0.0b0"
 description = "Sirius & the Castle — Cross-platform retro CLI cyber-buddy hub"
 readme = "README.md"
 requires-python = ">=3.10"
